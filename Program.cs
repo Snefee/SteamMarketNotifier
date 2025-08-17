@@ -28,7 +28,8 @@ public class AppConfig
     public string ItemName { get; set; } = string.Empty;
     public int CurrencyType { get; set; }
     public string NtfyTopic { get; set; } = string.Empty;
-    public float PriceThreshold { get; set; }
+    public float PriceRiseThreshold { get; set; }
+    public float PriceDropThreshold { get; set; }
 }
 
 public class Program
@@ -38,7 +39,8 @@ public class Program
     private static int currencyType = 1; // Default currency = USD
     private static string apiUrl => $"https://steamcommunity.com/market/priceoverview/?currency={currencyType}&appid=730&market_hash_name={itemName}";
 
-    private static float priceThreshold;
+    private static float priceRiseThreshold = 0.0f;
+    private static float priceDropThreshold = 0.0f;
     private static string ntfyTopic = string.Empty;
     private static bool isNtfyEnabled => !string.IsNullOrEmpty(ntfyTopic);
     private static string itemName = string.Empty;
@@ -62,13 +64,15 @@ public class Program
             itemName = config.ItemName;
             currencyType = config.CurrencyType;
             ntfyTopic = config.NtfyTopic;
-            priceThreshold = config.PriceThreshold;
+            priceRiseThreshold = config.PriceRiseThreshold;
+            priceDropThreshold = config.PriceDropThreshold;
 
             Console.WriteLine("--- Loaded configuration ---");
             Console.WriteLine($"Tracked Item: {itemName}");
             Console.WriteLine($"Currency Type: {currencyType}");
             Console.WriteLine($"Ntfy Topic: {ntfyTopic}");
-            Console.WriteLine($"Price Threshold: {priceThreshold}");
+            Console.WriteLine($"Price Threshold: {priceRiseThreshold}");
+            Console.WriteLine($"Price Drop Threshold: {priceDropThreshold}");
             Console.WriteLine("-----------------------------------");
             Thread.Sleep(2500);
         }
@@ -149,28 +153,51 @@ public class Program
                 }
             }
 
-            if (isNtfyEnabled == true)
+            if (isNtfyEnabled)
             {
                 Console.WriteLine("--- Configure Price Alert ---");
                 while (true)
                 {
-                    Console.Write("Input price threshold at which the alert is sent (ex. 08,50): ");
-                    string? priceInput = Console.ReadLine();
+                    Console.Write("Enter price rise threshold (ex. 08,50) or press enter to skip: ");
+                    string? priceRiseInput = Console.ReadLine();
 
                     // Convert comma to dot for decimal parsing
-                    if (priceInput != null)
+                    if (priceRiseInput != null)
                     {
-                        priceInput = priceInput.Replace(',', '.');
+                        priceRiseInput = priceRiseInput.Replace(',', '.');
                     }
 
-                    if (float.TryParse(priceInput, NumberStyles.Any, CultureInfo.InvariantCulture, out priceThreshold) && priceThreshold > 0)
+                    if (float.TryParse(priceRiseInput, NumberStyles.Any, CultureInfo.InvariantCulture, out priceRiseThreshold) && priceRiseThreshold > 0)
+                    {
+                        break;
+                    }
+                    else if (string.IsNullOrEmpty(priceRiseInput))
+                    {
+                        priceRiseThreshold = 0.0f; // No threshold set
+                    }
+                    else
+                    {
+                        Console.ForegroundColor = ConsoleColor.Red;
+                        Console.WriteLine("Wrong input. Enter positive number.");
+                        Console.ResetColor();
+                    }
+
+                    Console.Write("Enter price drop threshold (ex. 05,23) or press enter to skip: ");
+                    string? priceDropInput = Console.ReadLine();
+
+                    if (priceDropInput != null)
+                    {
+                        priceDropInput = priceDropInput.Replace(',', '.');
+                    }
+
+                    if (float.TryParse(priceDropInput, NumberStyles.Any, CultureInfo.InvariantCulture, out priceDropThreshold) && priceDropThreshold > 0)
                     {
                         break;
                     }
                     else
                     {
                         Console.ForegroundColor = ConsoleColor.Red;
-                        Console.WriteLine("Wrong input. Input positive number.");
+                        Console.WriteLine("Wrong input. Enter positive number.");
                         Console.ResetColor();
                     }
                 }
@@ -181,7 +208,8 @@ public class Program
                 {
                     ItemName = Uri.UnescapeDataString(itemName),
                     CurrencyType = currencyType,
-                    PriceThreshold = priceThreshold,
+                    PriceRiseThreshold = priceRiseThreshold,
+                    PriceDropThreshold = priceDropThreshold,
                     NtfyTopic = ntfyTopic
                 };
             SaveConfig(config);
@@ -224,18 +252,26 @@ public class Program
                 Console.WriteLine($"Median price change: \t{(previousMedianPrice.HasValue ? (currentMedian - previousMedianPrice.Value).ToString("F2", CultureInfo.InvariantCulture) : "N/A")}");
                 Console.WriteLine("------------------------------------------");
 
-                if (currentLowest > priceThreshold && !isAlertSent && isNtfyEnabled == true)
+                if (currentLowest > priceRiseThreshold && isNtfyEnabled && priceRiseThreshold != 0.0f && !isAlertSent)
                 {
                     Console.WriteLine("\nWent over the threshold! Sending notification...");
                     string message = $"Item's price went over the threshold! Current price: {priceData.LowestPrice}";
                     await SendNtfyNotification(message);
                     isAlertSent = true; // Set alert as sent
                 }
-                // Reset alert if price falls below threshold
-                else if (currentLowest <= priceThreshold && isAlertSent)
+                // Reset alert if price is not hitting either threshold
+                else if (currentLowest <= priceRiseThreshold && currentLowest >= priceDropThreshold && isAlertSent)
                 {
-                    Console.WriteLine("\nPrice fell below the threshold. Alert reset.");
+                    Console.WriteLine("\nPrice not hitting the threshold anymore. Alert reset.");
                     isAlertSent = false;
+                }
+
+                if (currentLowest < priceDropThreshold && isNtfyEnabled && priceDropThreshold != 0.0f && !isAlertSent)
+                {
+                    Console.WriteLine("\nPrice is below the drop threshold. Sending notification...");
+                    string message = $"Item's price is below the price drop threshold! Current price: {priceData.LowestPrice}";
+                    await SendNtfyNotification(message);
+                    isAlertSent = true;
                 }
 
                 // Update previous prices for next comparison
@@ -245,7 +281,7 @@ public class Program
             else
             {
                 Console.ForegroundColor = ConsoleColor.DarkYellow;
-                Console.WriteLine("API did respond with a message, but with incorrect data. Check if item's name is correct");
+                Console.WriteLine("API did respond with a message, but with incorrect data. Check if item's name is set correctly");
                 Console.ResetColor();
             }
         }

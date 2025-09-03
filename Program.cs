@@ -7,7 +7,6 @@ using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 using System.IO;
 
-
 public class SteamMarketPrice
 {
     [JsonPropertyName("success")]
@@ -25,6 +24,7 @@ public class SteamMarketPrice
 
 public class AppConfig
 {
+    public int ActivePreset { get; set; }
     public string ItemName { get; set; } = string.Empty;
     public int CurrencyType { get; set; }
     public string NtfyTopic { get; set; } = string.Empty;
@@ -39,43 +39,94 @@ public class Program
     private static int currencyType = 1; // Default currency = USD
     private static string apiUrl => $"https://steamcommunity.com/market/priceoverview/?currency={currencyType}&appid=730&market_hash_name={itemName}";
 
+    private static int activePreset = 1;
     private static float priceRiseThreshold = 0.0f;
     private static float priceDropThreshold = 0.0f;
     private static string ntfyTopic = string.Empty;
     private static bool isNtfyEnabled => !string.IsNullOrEmpty(ntfyTopic);
     private static string itemName = string.Empty;
 
-    // Last prices variables to track changes
     private static float? previousLowestPrice = null;
     private static float? previousMedianPrice = null;
+    private static bool isAlertSent = false;
 
-    private static bool isAlertSent = false; // Prevents multiple alerts for the same price threshold
-
-    // File path for configuration
     private static readonly string configFile = Path.Combine(AppContext.BaseDirectory, "config.json");
 
-    // === Main method to configure all settings ===
+
     public static async Task Main(string[] args)
     {
         // Load configuration from file
         var config = LoadConfig();
         if (config != null)
-        {
-            itemName = config.ItemName;
-            currencyType = config.CurrencyType;
-            ntfyTopic = config.NtfyTopic;
-            priceRiseThreshold = config.PriceRiseThreshold;
-            priceDropThreshold = config.PriceDropThreshold;
+            while (true)
+            {
+                Console.Clear();
 
-            Console.WriteLine("--- Loaded configuration ---");
-            Console.WriteLine($"Tracked Item: {itemName}");
-            Console.WriteLine($"Currency Type: {currencyType}");
-            Console.WriteLine($"Ntfy Topic: {ntfyTopic}");
-            Console.WriteLine($"Price Threshold: {priceRiseThreshold}");
-            Console.WriteLine($"Price Drop Threshold: {priceDropThreshold}");
-            Console.WriteLine("-----------------------------------");
-            Thread.Sleep(2500);
-        }
+                itemName = config.ItemName;
+                currencyType = config.CurrencyType;
+                ntfyTopic = config.NtfyTopic;
+                priceRiseThreshold = config.PriceRiseThreshold;
+                priceDropThreshold = config.PriceDropThreshold;
+
+                for (int i = 1; i <= 5; i++)
+                {
+                    if (activePreset == i)
+                    {
+                        Console.BackgroundColor = ConsoleColor.Cyan;
+                        Console.ForegroundColor = ConsoleColor.Black;
+                    }
+                    Console.Write($" Preset {i} ");
+                    Console.ResetColor();
+
+                    if (i < 5)
+                    {
+                        Console.Write("|");
+                    }
+                }
+
+                Console.WriteLine("\n\n--- Selected configuration ---");
+                Console.WriteLine($"Tracked Item: {itemName.Replace("%20", " ")}");
+                Console.WriteLine($"Currency Type: {currencyType}");
+                Console.WriteLine($"Ntfy Topic: {ntfyTopic}");
+                Console.WriteLine($"Price Rise Threshold: {priceRiseThreshold}");
+                Console.WriteLine($"Price Drop Threshold: {priceDropThreshold}");
+                Console.WriteLine("-----------------------------------");
+
+                Console.ForegroundColor = ConsoleColor.Yellow;
+                Console.WriteLine("\nUse Left/Right arrow keys [or A/D] to switch presets.");
+                Console.WriteLine("Press C to change selected preset's configuration");
+                Console.WriteLine("Press Enter to start tracking.");
+                Console.ResetColor();
+
+                var keyInfo = Console.ReadKey(true);
+
+                if (keyInfo.Key == ConsoleKey.LeftArrow || keyInfo.Key == ConsoleKey.A)
+                {
+                    activePreset = (activePreset == 1) ? 5 : activePreset - 1;
+                }
+                else if (keyInfo.Key == ConsoleKey.RightArrow || keyInfo.Key == ConsoleKey.D)
+                {
+                    activePreset = (activePreset == 5) ? 1 : activePreset + 1;
+                }
+                else if (keyInfo.Key == ConsoleKey.C)
+                {
+                    // Enable configuration mode
+
+
+                    Console.Clear();
+                    Console.WriteLine($"--- Configuring Preset {activePreset} ---");
+
+                    Console.ForegroundColor = ConsoleColor.Yellow;
+                    Console.WriteLine("Use Up/Down arrow keys [or W/S] to select an option");
+                }
+                else if (keyInfo.Key == ConsoleKey.Enter)
+                {
+                    // Save the last selected preset before starting
+                    config.ActivePreset = activePreset;
+                    SaveConfig(config);
+                    break;
+                }
+            }
         else
         {
             Console.WriteLine("--- Welcome to Steam Market Notifier! ---");
@@ -83,7 +134,6 @@ public class Program
             {
                 Console.WriteLine("Write the exact english name of the item you want to track (case-sensitive):");
                 string? itemInput = Console.ReadLine();
-
 
                 if (!string.IsNullOrEmpty(itemInput))
                 {
@@ -203,15 +253,16 @@ public class Program
                 }
             }
 
-                // Save configuration to file
-                config = new AppConfig
-                {
-                    ItemName = Uri.UnescapeDataString(itemName),
-                    CurrencyType = currencyType,
-                    PriceRiseThreshold = priceRiseThreshold,
-                    PriceDropThreshold = priceDropThreshold,
-                    NtfyTopic = ntfyTopic
-                };
+            // Save configuration to file
+            config = new AppConfig
+            {
+                ActivePreset = activePreset,
+                ItemName = Uri.UnescapeDataString(itemName),
+                CurrencyType = currencyType,
+                PriceRiseThreshold = priceRiseThreshold,
+                PriceDropThreshold = priceDropThreshold,
+                NtfyTopic = ntfyTopic
+            };
             SaveConfig(config);
 
             Console.WriteLine("Tracking Steam Market price of selected item...");
@@ -322,7 +373,6 @@ public class Program
             Console.WriteLine($"Critical error while sending the notification: {e.Message}");
         }
     }
-
 
     // === Supporting function to parse price strings ===
     private static float ParsePrice(string priceString)

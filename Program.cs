@@ -22,14 +22,19 @@ public class SteamMarketPrice
     public string? MedianPrice { get; set; }
 }
 
-public class AppConfig
+public class PresetConfig
 {
-    public int ActivePreset { get; set; }
     public string ItemName { get; set; } = string.Empty;
     public int CurrencyType { get; set; }
     public string NtfyTopic { get; set; } = string.Empty;
     public float PriceRiseThreshold { get; set; }
     public float PriceDropThreshold { get; set; }
+}
+
+public class RootConfig
+{
+    public int ActivePreset { get; set; }
+    public List<PresetConfig> Presets { get; set; } = new List<PresetConfig>();
 }
 
 public class Program
@@ -62,11 +67,24 @@ public class Program
             {
                 Console.Clear();
 
-                itemName = config.ItemName;
-                currencyType = config.CurrencyType;
-                ntfyTopic = config.NtfyTopic;
-                priceRiseThreshold = config.PriceRiseThreshold;
-                priceDropThreshold = config.PriceDropThreshold;
+                var rootConfig = LoadConfig();
+                if (rootConfig != null)
+                {
+                    if (activePreset >= 1 && activePreset <= rootConfig.Presets.Count)
+                    {
+                        var currentPresetConfig = rootConfig.Presets[activePreset - 1];
+
+                        itemName = currentPresetConfig.ItemName;
+                        currencyType = currentPresetConfig.CurrencyType;
+                        ntfyTopic = currentPresetConfig.NtfyTopic;
+                        priceRiseThreshold = currentPresetConfig.PriceRiseThreshold;
+                        priceDropThreshold = currentPresetConfig.PriceDropThreshold;
+                    }
+                    else
+                    {
+                        // Handle invalid preset index
+                    }
+                }
 
                 for (int i = 1; i <= 5; i++)
                 {
@@ -85,7 +103,7 @@ public class Program
                 }
 
                 Console.WriteLine("\n\n--- Selected configuration ---");
-                Console.WriteLine($"Tracked Item: {itemName.Replace("%20", " ")}");
+                Console.WriteLine($"Tracked Item: {itemName.Replace("%20", " ").Replace("%7C", "|")}");
                 Console.WriteLine($"Currency Type: {currencyType}");
                 Console.WriteLine($"Ntfy Topic: {ntfyTopic}");
                 Console.WriteLine($"Price Rise Threshold: {priceRiseThreshold}");
@@ -112,7 +130,6 @@ public class Program
                 {
                     // Enable configuration mode
 
-
                     Console.Clear();
                     Console.WriteLine($"--- Configuring Preset {activePreset} ---");
 
@@ -137,7 +154,7 @@ public class Program
 
                 if (!string.IsNullOrEmpty(itemInput))
                 {
-                    itemName = itemInput.Replace(" ", "%20");
+                    itemName = itemInput.Replace(" ", "%20").Replace("|", "%7C");
                     break;
                 }
                 else
@@ -219,11 +236,47 @@ public class Program
 
                     if (float.TryParse(priceRiseInput, NumberStyles.Any, CultureInfo.InvariantCulture, out priceRiseThreshold) && priceRiseThreshold > 0)
                     {
-                        break;
+                        Console.Write("Enter price drop threshold (ex. 05,23) or press enter to skip: ");
+                        string? priceDropInput = Console.ReadLine();
+
+                        if (priceDropInput != null)
+                        {
+                            priceDropInput = priceDropInput.Replace(',', '.');
+                        }
+
+                        if (float.TryParse(priceDropInput, NumberStyles.Any, CultureInfo.InvariantCulture, out priceDropThreshold) && priceDropThreshold > 0)
+                        {
+                            break;
+                        }
+                        else
+                        {
+                            Console.ForegroundColor = ConsoleColor.Red;
+                            Console.WriteLine("Wrong input. Enter positive number.");
+                            Console.ResetColor();
+                        }
                     }
                     else if (string.IsNullOrEmpty(priceRiseInput))
                     {
                         priceRiseThreshold = 0.0f; // No threshold set
+
+                        Console.Write("Enter price drop threshold (ex. 05,23) or press enter to skip: ");
+                        string? priceDropInput = Console.ReadLine();
+
+                        if (priceDropInput != null)
+                        {
+                            priceDropInput = priceDropInput.Replace(',', '.');
+                        }
+
+                        if (float.TryParse(priceDropInput, NumberStyles.Any, CultureInfo.InvariantCulture, out priceDropThreshold) && priceDropThreshold > 0)
+                        {
+                            break;
+                        }
+                        else
+                        {
+                            Console.ForegroundColor = ConsoleColor.Red;
+                            Console.WriteLine("Wrong input. Enter positive number.");
+                            Console.ResetColor();
+                        }
                     }
                     else
                     {
@@ -232,38 +285,32 @@ public class Program
                         Console.ResetColor();
                     }
 
-                    Console.Write("Enter price drop threshold (ex. 05,23) or press enter to skip: ");
-                    string? priceDropInput = Console.ReadLine();
-
-                    if (priceDropInput != null)
-                    {
-                        priceDropInput = priceDropInput.Replace(',', '.');
-                    }
-
-                    if (float.TryParse(priceDropInput, NumberStyles.Any, CultureInfo.InvariantCulture, out priceDropThreshold) && priceDropThreshold > 0)
-                    {
-                        break;
-                    }
-                    else
-                    {
-                        Console.ForegroundColor = ConsoleColor.Red;
-                        Console.WriteLine("Wrong input. Enter positive number.");
-                        Console.ResetColor();
-                    }
+                    
                 }
             }
 
             // Save configuration to file
-            config = new AppConfig
+            var newRootConfig = new RootConfig
             {
-                ActivePreset = activePreset,
-                ItemName = Uri.UnescapeDataString(itemName),
+                ActivePreset = 1
+            };
+
+            var firstPreset = new PresetConfig
+            {
+                ItemName = itemName.Replace("%20", " "),
                 CurrencyType = currencyType,
                 PriceRiseThreshold = priceRiseThreshold,
                 PriceDropThreshold = priceDropThreshold,
                 NtfyTopic = ntfyTopic
             };
-            SaveConfig(config);
+            newRootConfig.Presets.Add(firstPreset);
+
+            for (int i = 1; i < 5; i++)
+            {
+                newRootConfig.Presets.Add(new PresetConfig { ItemName = "Not Set" });
+            }
+            
+            SaveConfig(newRootConfig);
 
             Console.WriteLine("Tracking Steam Market price of selected item...");
         }
@@ -407,14 +454,14 @@ public class Program
         Console.ResetColor();
     }
 
-    private static AppConfig? LoadConfig()
+    private static RootConfig? LoadConfig()
     {
         if (File.Exists(configFile))
         {
             try
             {
                 string json = File.ReadAllText(configFile);
-                return JsonSerializer.Deserialize<AppConfig>(json);
+                return JsonSerializer.Deserialize<RootConfig>(json);
             }
             catch (Exception ex)
             {
@@ -425,7 +472,7 @@ public class Program
         return null;
     }
 
-    private static void SaveConfig(AppConfig config)
+    private static void SaveConfig(RootConfig config)
     {
         try
         {

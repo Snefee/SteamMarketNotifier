@@ -1,5 +1,6 @@
 # Steam Market Notifier
-A C# app that you can use to track prices of chosen items from the Steam market
+A C# app that you can use to track prices of chosen items from the Steam market <br>
+**Check the [Wiki](https://github.com/Snefee/SteamMarketNotifier/wiki)**
 ## Current Features
 - Track current price of chosen items [tracking only one item at a time is currently supported]
 - Set your designated currency [currently supported currencies are: USD, GBP, EUR, CHF, RUB, PLN, BRL, JPY, NOK, AED]

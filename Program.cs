@@ -6,6 +6,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 using System.IO;
+using System.Data;
 
 public class SteamMarketPrice
 {
@@ -55,11 +56,15 @@ public class Program
     private static float? previousMedianPrice = null;
     private static bool isAlertSent = false;
 
+    // === Application version ===
+    private static readonly string appVersion = "0.8.0";
+
     private static readonly string configFile = Path.Combine(AppContext.BaseDirectory, "config.json");
 
 
     public static async Task Main(string[] args)
     {
+    MainMenu:
         // Load configuration from file
         var config = LoadConfig();
         if (config != null)
@@ -67,24 +72,22 @@ public class Program
             {
                 Console.Clear();
 
-                var rootConfig = LoadConfig();
-                if (rootConfig != null)
+                // Use the 'config' object that was loaded once.
+                if (activePreset >= 1 && activePreset <= config.Presets.Count)
                 {
-                    if (activePreset >= 1 && activePreset <= rootConfig.Presets.Count)
-                    {
-                        var currentPresetConfig = rootConfig.Presets[activePreset - 1];
+                    var currentPresetConfig = config.Presets[activePreset - 1];
 
-                        itemName = currentPresetConfig.ItemName;
-                        currencyType = currentPresetConfig.CurrencyType;
-                        ntfyTopic = currentPresetConfig.NtfyTopic;
-                        priceRiseThreshold = currentPresetConfig.PriceRiseThreshold;
-                        priceDropThreshold = currentPresetConfig.PriceDropThreshold;
-                    }
-                    else
-                    {
-                        // Handle invalid preset index
-                    }
+                    itemName = currentPresetConfig.ItemName;
+                    currencyType = currentPresetConfig.CurrencyType;
+                    ntfyTopic = currentPresetConfig.NtfyTopic;
+                    priceRiseThreshold = currentPresetConfig.PriceRiseThreshold;
+                    priceDropThreshold = currentPresetConfig.PriceDropThreshold;
                 }
+                else
+                {
+                    // Handle invalid preset index
+                }
+
 
                 for (int i = 1; i <= 5; i++)
                 {
@@ -114,6 +117,8 @@ public class Program
                 Console.WriteLine("\nUse Left/Right arrow keys [or A/D] to switch presets.");
                 Console.WriteLine("Press C to change selected preset's configuration");
                 Console.WriteLine("Press Enter to start tracking.");
+                Console.ForegroundColor = ConsoleColor.Gray;
+                Console.WriteLine($"App Version: {appVersion}");
                 Console.ResetColor();
 
                 var keyInfo = Console.ReadKey(true);
@@ -129,12 +134,12 @@ public class Program
                 else if (keyInfo.Key == ConsoleKey.C)
                 {
                     // Enable configuration mode
-
                     Console.Clear();
                     Console.WriteLine($"--- Configuring Preset {activePreset} ---");
 
-                    Console.ForegroundColor = ConsoleColor.Yellow;
-                    Console.WriteLine("Use Up/Down arrow keys [or W/S] to select an option");
+                    var presetToEdit = config.Presets[activePreset - 1];
+                    ConfigurePresetDetails(presetToEdit);
+                    SaveConfig(config);
                 }
                 else if (keyInfo.Key == ConsoleKey.Enter)
                 {
@@ -146,182 +151,161 @@ public class Program
             }
         else
         {
+            // First time setup
             Console.WriteLine("--- Welcome to Steam Market Notifier! ---");
-            while (true)
-            {
-                Console.WriteLine("Write the exact english name of the item you want to track (case-sensitive):");
-                string? itemInput = Console.ReadLine();
-
-                if (!string.IsNullOrEmpty(itemInput))
-                {
-                    itemName = itemInput.Replace(" ", "%20").Replace("|", "%7C");
-                    break;
-                }
-                else
-                {
-                    Console.ForegroundColor = ConsoleColor.Red;
-                    Console.WriteLine("Item name cannot be empty. Please try again.");
-                    Console.ResetColor();
-                }
-            }
-
-            Console.WriteLine("--- Choose your preffered currency ---");
-            while (true)
-            {
-                Console.WriteLine("Input currency type (1-10): ");
-                Console.WriteLine("1. USD (default)");
-                Console.WriteLine("2. GBP");
-                Console.WriteLine("3. EUR");
-                Console.WriteLine("4. CHF");
-                Console.WriteLine("5. RUB");
-                Console.WriteLine("6. PLN");
-                Console.WriteLine("7. BRL");
-                Console.WriteLine("8. JPY");
-                Console.WriteLine("9. NOK");
-                Console.WriteLine("10. AED");
-
-                string? currencyInput = Console.ReadLine();
-
-                if (int.TryParse(currencyInput, out currencyType) && currencyType >= 1 && currencyType <= 10)
-                {
-                    break;
-                }
-                else
-                {
-                    Console.ForegroundColor = ConsoleColor.Red;
-                    Console.WriteLine("Wrong input. Input a number between 1 to 10.");
-                    Console.ResetColor();
-                }
-            }
-
-            Console.WriteLine("--- Set your Ntfy token ID for notifications ---");
-            while (true)
-            {
-                Console.WriteLine("If you don't have one, you can create it at https://ntfy.sh/");
-                Console.WriteLine("Or leave it empty and press enter to skip notifications.");
-
-                string? ntfyInput = Console.ReadLine();
-
-                if (string.IsNullOrEmpty(ntfyInput))
-                {
-                    ntfyTopic = string.Empty; // No notifications
-                    break;
-                }
-                else if (ntfyInput.Length >= 5 && ntfyInput.Length <= 64)
-                {
-                    ntfyTopic = ntfyInput.Trim();
-                    break;
-                }
-                else
-                {
-                    Console.ForegroundColor = ConsoleColor.Red;
-                    Console.WriteLine("Wrong input. Input a valid token ID (5-64 characters).");
-                    Console.ResetColor();
-                }
-            }
-
-            if (isNtfyEnabled)
-            {
-                Console.WriteLine("--- Configure Price Alert ---");
-                while (true)
-                {
-                    Console.Write("Enter price rise threshold (ex. 08,50) or press enter to skip: ");
-                    string? priceRiseInput = Console.ReadLine();
-
-                    // Convert comma to dot for decimal parsing
-                    if (priceRiseInput != null)
-                    {
-                        priceRiseInput = priceRiseInput.Replace(',', '.');
-                    }
-
-                    if (float.TryParse(priceRiseInput, NumberStyles.Any, CultureInfo.InvariantCulture, out priceRiseThreshold) && priceRiseThreshold > 0)
-                    {
-                        Console.Write("Enter price drop threshold (ex. 05,23) or press enter to skip: ");
-                        string? priceDropInput = Console.ReadLine();
-
-                        if (priceDropInput != null)
-                        {
-                            priceDropInput = priceDropInput.Replace(',', '.');
-                        }
-
-                        if (float.TryParse(priceDropInput, NumberStyles.Any, CultureInfo.InvariantCulture, out priceDropThreshold) && priceDropThreshold > 0)
-                        {
-                            break;
-                        }
-                        else
-                        {
-                            Console.ForegroundColor = ConsoleColor.Red;
-                            Console.WriteLine("Wrong input. Enter positive number.");
-                            Console.ResetColor();
-                        }
-                    }
-                    else if (string.IsNullOrEmpty(priceRiseInput))
-                    {
-                        priceRiseThreshold = 0.0f; // No threshold set
-
-                        Console.Write("Enter price drop threshold (ex. 05,23) or press enter to skip: ");
-                        string? priceDropInput = Console.ReadLine();
-
-                        if (priceDropInput != null)
-                        {
-                            priceDropInput = priceDropInput.Replace(',', '.');
-                        }
-
-                        if (float.TryParse(priceDropInput, NumberStyles.Any, CultureInfo.InvariantCulture, out priceDropThreshold) && priceDropThreshold > 0)
-                        {
-                            break;
-                        }
-                        else
-                        {
-                            Console.ForegroundColor = ConsoleColor.Red;
-                            Console.WriteLine("Wrong input. Enter positive number.");
-                            Console.ResetColor();
-                        }
-                    }
-                    else
-                    {
-                        Console.ForegroundColor = ConsoleColor.Red;
-                        Console.WriteLine("Wrong input. Enter positive number.");
-                        Console.ResetColor();
-                    }
-
-                    
-                }
-            }
-
-            // Save configuration to file
-            var newRootConfig = new RootConfig
-            {
-                ActivePreset = 1
-            };
-
-            var firstPreset = new PresetConfig
-            {
-                ItemName = itemName.Replace("%20", " "),
-                CurrencyType = currencyType,
-                PriceRiseThreshold = priceRiseThreshold,
-                PriceDropThreshold = priceDropThreshold,
-                NtfyTopic = ntfyTopic
-            };
-            newRootConfig.Presets.Add(firstPreset);
-
-            for (int i = 1; i < 5; i++)
+            
+            var newRootConfig = new RootConfig { ActivePreset = 1 };
+            for (int i = 0; i < 5; i++)
             {
                 newRootConfig.Presets.Add(new PresetConfig { ItemName = "Not Set" });
             }
+
+            var firstPreset = newRootConfig.Presets[0];
+            ConfigurePresetDetails(firstPreset);
             
             SaveConfig(newRootConfig);
 
-            Console.WriteLine("Tracking Steam Market price of selected item...");
+            Console.WriteLine("Configuration saved!");
+            await Task.Delay(1000);
+            goto MainMenu;
         }
 
         while (true)
         {
             await FetchAndDisplayPrice();
-            Console.WriteLine($"\nNext update in 5 minutes...");
-            await Task.Delay(TimeSpan.FromMinutes(5));
+            Console.WriteLine($"\nNext update in 5 minutes...\nPress ESC to return to menu");
+
+            for (int i = 0; i < 3000; i++)
+            {
+                if (Console.KeyAvailable)
+                {
+                    var keyInfo = Console.ReadKey(true);
+                    if (keyInfo.Key == ConsoleKey.Escape)
+                    {
+                        goto MainMenu;
+                    }
+                }
+                await Task.Delay(100);
+            }
         }
     }
+
+    private static void ConfigurePresetDetails(PresetConfig presetToConfigure)
+    {
+        // Configure Item Name
+        while (true)
+        {
+            Console.WriteLine("Write the exact english name of the item you want to track (case-sensitive):");
+            string? itemInput = Console.ReadLine();
+
+            if (!string.IsNullOrEmpty(itemInput))
+            {
+                presetToConfigure.ItemName = itemInput.Replace(" ", "%20").Replace("|", "%7C");
+                break;
+            }
+            else
+            {
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.WriteLine("Item name cannot be empty. Please try again.");
+                Console.ResetColor();
+            }
+        }
+
+        // Configure Currency
+        while (true)
+        {
+            Console.WriteLine("--- Choose your preffered currency ---");
+            Console.WriteLine("Input currency type (1-10): ");
+            Console.WriteLine("1. USD (default)\n2. GBP\n3. EUR\n4. CHF\n5. RUB\n6. PLN\n7. BRL\n8. JPY\n9. NOK\n10. AED");
+
+            string? currencyInput = Console.ReadLine();
+            if (int.TryParse(currencyInput, out int selectedCurrency) && selectedCurrency >= 1 && selectedCurrency <= 10)
+            {
+                presetToConfigure.CurrencyType = selectedCurrency;
+                break;
+            }
+            else
+            {
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.WriteLine("Wrong input. Input a number between 1 to 10.");
+                Console.ResetColor();
+            }
+        }
+
+        // Configure Ntfy.sh topic
+        while (true)
+        {
+            Console.WriteLine("--- Set your Ntfy topic ID for notifications ---");
+            Console.WriteLine("If you don't have one, you check how to make it here: https://github.com/Snefee/SteamMarketNotifier/wiki/NTFY-Setup");
+            Console.WriteLine("Or leave it empty and press enter to skip notifications.");
+
+            string? ntfyInput = Console.ReadLine();
+            if (string.IsNullOrEmpty(ntfyInput))
+            {
+                presetToConfigure.NtfyTopic = string.Empty;
+                break;
+            }
+            else if (ntfyInput.Length >= 5 && ntfyInput.Length <= 64)
+            {
+                presetToConfigure.NtfyTopic = ntfyInput.Trim();
+                break;
+            }
+            else
+            {
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.WriteLine("Wrong input. Input a valid token ID (5-64 characters).");
+                Console.ResetColor();
+            }
+        }
+
+        // Configure Price Alerts if Ntfy is enabled
+        if (!string.IsNullOrEmpty(presetToConfigure.NtfyTopic))
+        {
+            Console.WriteLine("--- Configure Price Alert ---");
+            while (true)
+            {
+                Console.Write("Enter price rise threshold (ex. 08,50) or press enter to skip: ");
+                string? priceRiseInput = Console.ReadLine()?.Replace(',', '.');
+
+                if (string.IsNullOrEmpty(priceRiseInput))
+                {
+                    presetToConfigure.PriceRiseThreshold = 0.0f;
+                }
+                else if (float.TryParse(priceRiseInput, NumberStyles.Any, CultureInfo.InvariantCulture, out float riseThreshold) && riseThreshold > 0)
+                {
+                    presetToConfigure.PriceRiseThreshold = riseThreshold;
+                }
+                else
+                {
+                    Console.ForegroundColor = ConsoleColor.Red;
+                    Console.WriteLine("Wrong input. Enter a positive number.");
+                    Console.ResetColor();
+                    continue;
+                }
+
+                Console.Write("Enter price drop threshold (ex. 05,23) or press enter to skip: ");
+                string? priceDropInput = Console.ReadLine()?.Replace(',', '.');
+
+                if (string.IsNullOrEmpty(priceDropInput))
+                {
+                    presetToConfigure.PriceDropThreshold = 0.0f;
+                    break;
+                }
+                else if (float.TryParse(priceDropInput, NumberStyles.Any, CultureInfo.InvariantCulture, out float dropThreshold) && dropThreshold > 0)
+                {
+                    presetToConfigure.PriceDropThreshold = dropThreshold;
+                    break;
+                }
+                else
+                {
+                    Console.ForegroundColor = ConsoleColor.Red;
+                    Console.WriteLine("Wrong input. Enter a positive number.");
+                    Console.ResetColor();
+                }
+            }
+        }
+    }
+
 
     // === Fetch price data from Steam Market API and display it ===
     private static async Task FetchAndDisplayPrice()

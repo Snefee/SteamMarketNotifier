@@ -57,13 +57,15 @@ public class Program
     private static bool isAlertSent = false;
 
     // === Application version ===
-    private static readonly string appVersion = "0.8.0";
+    private static readonly string appVersion = "0.8.1";
 
     private static readonly string configFile = Path.Combine(AppContext.BaseDirectory, "config.json");
 
 
     public static async Task Main(string[] args)
     {
+        Console.InputEncoding = Encoding.UTF8;
+        Console.OutputEncoding = Encoding.UTF8;
     MainMenu:
         // Load configuration from file
         var config = LoadConfig();
@@ -106,7 +108,7 @@ public class Program
                 }
 
                 Console.WriteLine("\n\n--- Selected configuration ---");
-                Console.WriteLine($"Tracked Item: {itemName.Replace("%20", " ").Replace("%7C", "|")}");
+                Console.WriteLine($"Tracked Item: {itemName.Replace("%20", " ").Replace("%7C", "|").Replace("%E2%98%85", "★")}");
                 Console.WriteLine($"Currency Type: {currencyType}");
                 Console.WriteLine($"Ntfy Topic: {ntfyTopic}");
                 Console.WriteLine($"Price Rise Threshold: {priceRiseThreshold}");
@@ -200,7 +202,7 @@ public class Program
 
             if (!string.IsNullOrEmpty(itemInput))
             {
-                presetToConfigure.ItemName = itemInput.Replace(" ", "%20").Replace("|", "%7C");
+                presetToConfigure.ItemName = itemInput.Replace(" ", "%20").Replace("|", "%7C").Replace("★", "%E2%98%85");
                 break;
             }
             else
@@ -312,7 +314,7 @@ public class Program
     {
         Console.Clear();
         Console.WriteLine($"--- Last update: {DateTime.Now:HH:mm:ss} ---");
-        Console.WriteLine($"Tracking item: {itemName.Replace("%20", " ")}");
+        Console.WriteLine($"Tracking item: {itemName.Replace("%20", " ").Replace("%7C", "|").Replace("%E2%98%85", "★")}");
         Console.WriteLine($"{apiUrl}");
 
         try

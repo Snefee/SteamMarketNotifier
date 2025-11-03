@@ -197,12 +197,22 @@ public class Program
         // Configure Item Name
         while (true)
         {
-            Console.WriteLine("Write the exact english name of the item you want to track (case-sensitive):");
+            Console.WriteLine("Write the exact item name or paste a full Steam Market link:");
             string? itemInput = Console.ReadLine();
 
             if (!string.IsNullOrEmpty(itemInput))
             {
-                presetToConfigure.ItemName = itemInput.Replace(" ", "%20").Replace("|", "%7C").Replace("★", "%E2%98%85");
+                const string urlPrefix = "https://steamcommunity.com/market/listings/730/";
+                if (itemInput.StartsWith(urlPrefix, StringComparison.OrdinalIgnoreCase))
+                {
+                    // Input is a URL, extract the item name.
+                    presetToConfigure.ItemName = itemInput.Substring(urlPrefix.Length);
+                }
+                else
+                {
+                    // Input is a name, encode it manually.
+                    presetToConfigure.ItemName = itemInput.Replace(" ", "%20").Replace("|", "%7C").Replace("★", "%E2%98%85");
+                }
                 break;
             }
             else

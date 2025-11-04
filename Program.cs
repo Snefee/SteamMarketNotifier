@@ -57,7 +57,7 @@ public class Program
     private static bool isAlertSent = false;
 
     // === Application version ===
-    private static readonly string appVersion = "0.8.1";
+    private static readonly string appVersion = "0.8.2";
 
     private static readonly string configFile = Path.Combine(AppContext.BaseDirectory, "config.json");
 
@@ -67,6 +67,9 @@ public class Program
         Console.InputEncoding = Encoding.UTF8;
         Console.OutputEncoding = Encoding.UTF8;
     MainMenu:
+        previousLowestPrice = null;
+        previousMedianPrice = null;
+
         // Load configuration from file
         var config = LoadConfig();
         if (config != null)
@@ -74,7 +77,6 @@ public class Program
             {
                 Console.Clear();
 
-                // Use the 'config' object that was loaded once.
                 if (activePreset >= 1 && activePreset <= config.Presets.Count)
                 {
                     var currentPresetConfig = config.Presets[activePreset - 1];
@@ -108,7 +110,7 @@ public class Program
                 }
 
                 Console.WriteLine("\n\n--- Selected configuration ---");
-                Console.WriteLine($"Tracked Item: {itemName.Replace("%20", " ").Replace("%7C", "|").Replace("%E2%98%85", "★")}");
+                Console.WriteLine($"Tracked Item: {itemName.Replace("%20", " ").Replace("%7C", "|").Replace("%E2%98%85", "★").Replace("%E2%84%A2", "™")}");
                 Console.WriteLine($"Currency Type: {currencyType}");
                 Console.WriteLine($"Ntfy Topic: {ntfyTopic}");
                 Console.WriteLine($"Price Rise Threshold: {priceRiseThreshold}");
@@ -211,7 +213,7 @@ public class Program
                 else
                 {
                     // Input is a name, encode it manually.
-                    presetToConfigure.ItemName = itemInput.Replace(" ", "%20").Replace("|", "%7C").Replace("★", "%E2%98%85");
+                    presetToConfigure.ItemName = itemInput.Replace(" ", "%20").Replace("|", "%7C").Replace("★", "%E2%98%85").Replace("™", "%E2%84%A2");
                 }
                 break;
             }

@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Globalization;
 using System.Net.Http;
 using System.Text;
@@ -6,7 +7,6 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 using System.IO;
-using System.Data;
 
 public class SteamMarketPrice
 {
@@ -57,7 +57,7 @@ public class Program
     private static bool isAlertSent = false;
 
     // === Application version ===
-    private static readonly string appVersion = "0.8.2";
+    private static readonly string appVersion = "0.8.3";
 
     private static readonly string configFile = Path.Combine(AppContext.BaseDirectory, "config.json");
 
@@ -140,10 +140,39 @@ public class Program
                     // Enable configuration mode
                     Console.Clear();
                     Console.WriteLine($"--- Configuring Preset {activePreset} ---");
+                    Console.WriteLine("(Press ESC at any time to cancel changes)");
 
-                    var presetToEdit = config.Presets[activePreset - 1];
-                    ConfigurePresetDetails(presetToEdit);
-                    SaveConfig(config);
+                    // Create a temporary copy of the preset. 
+                    var originalPreset = config.Presets[activePreset - 1];
+                    var tempPreset = new PresetConfig
+                    {
+                        ItemName = originalPreset.ItemName,
+                        CurrencyType = originalPreset.CurrencyType,
+                        NtfyTopic = originalPreset.NtfyTopic,
+                        PriceRiseThreshold = originalPreset.PriceRiseThreshold,
+                        PriceDropThreshold = originalPreset.PriceDropThreshold
+                    };
+
+                    try
+                    {
+                        // Pass the temporary object to the configuration method
+                        ConfigurePresetDetails(tempPreset);
+
+                        config.Presets[activePreset - 1] = tempPreset;
+                        SaveConfig(config);
+                        Console.ForegroundColor = ConsoleColor.Green;
+                        Console.WriteLine("\nConfiguration saved successfully!");
+                        Console.ResetColor();
+                        await Task.Delay(1000);
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        // Handle the ESC press
+                        Console.ForegroundColor = ConsoleColor.Red;
+                        Console.WriteLine("\n\nConfiguration cancelled. No changes were made.");
+                        Console.ResetColor();
+                        await Task.Delay(1000);
+                    }
                 }
                 else if (keyInfo.Key == ConsoleKey.Enter)
                 {
@@ -157,7 +186,7 @@ public class Program
         {
             // First time setup
             Console.WriteLine("--- Welcome to Steam Market Notifier! ---");
-            
+
             var newRootConfig = new RootConfig { ActivePreset = 1 };
             for (int i = 0; i < 5; i++)
             {
@@ -165,11 +194,18 @@ public class Program
             }
 
             var firstPreset = newRootConfig.Presets[0];
-            ConfigurePresetDetails(firstPreset);
-            
-            SaveConfig(newRootConfig);
+            try
+            {
+                ConfigurePresetDetails(firstPreset);
+                SaveConfig(newRootConfig);
+                Console.WriteLine("Configuration saved!");
+            }
+            catch (OperationCanceledException)
+            {
+                Console.WriteLine("Setup cancelled, exiting.");
+                return;
+            }
 
-            Console.WriteLine("Configuration saved!");
             await Task.Delay(1000);
             goto MainMenu;
         }
@@ -200,7 +236,7 @@ public class Program
         while (true)
         {
             Console.WriteLine("Write the exact item name or paste a full Steam Market link:");
-            string? itemInput = Console.ReadLine();
+            string itemInput = ReadLineWithCancel();
 
             if (!string.IsNullOrEmpty(itemInput))
             {
@@ -232,7 +268,7 @@ public class Program
             Console.WriteLine("Input currency type (1-10): ");
             Console.WriteLine("1. USD (default)\n2. GBP\n3. EUR\n4. CHF\n5. RUB\n6. PLN\n7. BRL\n8. JPY\n9. NOK\n10. AED");
 
-            string? currencyInput = Console.ReadLine();
+            string currencyInput = ReadLineWithCancel();
             if (int.TryParse(currencyInput, out int selectedCurrency) && selectedCurrency >= 1 && selectedCurrency <= 10)
             {
                 presetToConfigure.CurrencyType = selectedCurrency;
@@ -253,7 +289,7 @@ public class Program
             Console.WriteLine("If you don't have one, you check how to make it here: https://github.com/Snefee/SteamMarketNotifier/wiki/NTFY-Setup");
             Console.WriteLine("Or leave it empty and press enter to skip notifications.");
 
-            string? ntfyInput = Console.ReadLine();
+            string ntfyInput = ReadLineWithCancel();
             if (string.IsNullOrEmpty(ntfyInput))
             {
                 presetToConfigure.NtfyTopic = string.Empty;
@@ -279,7 +315,7 @@ public class Program
             while (true)
             {
                 Console.Write("Enter price rise threshold (ex. 08,50) or press enter to skip: ");
-                string? priceRiseInput = Console.ReadLine()?.Replace(',', '.');
+                string priceRiseInput = ReadLineWithCancel().Replace(',', '.');
 
                 if (string.IsNullOrEmpty(priceRiseInput))
                 {
@@ -298,7 +334,7 @@ public class Program
                 }
 
                 Console.Write("Enter price drop threshold (ex. 05,23) or press enter to skip: ");
-                string? priceDropInput = Console.ReadLine()?.Replace(',', '.');
+                string priceDropInput = ReadLineWithCancel().Replace(',', '.');
 
                 if (string.IsNullOrEmpty(priceDropInput))
                 {
@@ -316,6 +352,41 @@ public class Program
                     Console.WriteLine("Wrong input. Enter a positive number.");
                     Console.ResetColor();
                 }
+            }
+        }
+    }
+
+    private static string ReadLineWithCancel()
+    {
+        StringBuilder inputBuffer = new StringBuilder();
+        while (true)
+        {
+            ConsoleKeyInfo keyInfo = Console.ReadKey(intercept: true);
+
+            if (keyInfo.Key == ConsoleKey.Escape)
+            {
+                throw new OperationCanceledException("Input cancelled by user.");
+            }
+
+            if (keyInfo.Key == ConsoleKey.Enter)
+            {
+                Console.WriteLine();
+                return inputBuffer.ToString();
+            }
+
+            if (keyInfo.Key == ConsoleKey.Backspace)
+            {
+                if (inputBuffer.Length > 0)
+                {
+                    inputBuffer.Remove(inputBuffer.Length - 1, 1);
+                    // Visual backspace handling
+                    Console.Write("\b \b");
+                }
+            }
+            else if (!char.IsControl(keyInfo.KeyChar))
+            {
+                inputBuffer.Append(keyInfo.KeyChar);
+                Console.Write(keyInfo.KeyChar);
             }
         }
     }

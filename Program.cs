@@ -7,6 +7,14 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 using System.IO;
+using System.Reflection;
+
+[JsonSourceGenerationOptions(WriteIndented = true)]
+[JsonSerializable(typeof(RootConfig))]
+[JsonSerializable(typeof(SteamMarketPrice))]
+internal partial class SourceGenerationContext : JsonSerializerContext
+{
+}
 
 public class SteamMarketPrice
 {
@@ -57,7 +65,7 @@ public class Program
     private static bool isAlertSent = false;
 
     // === Application version ===
-    private static readonly string appVersion = "0.8.5";
+    private static readonly string appVersion = Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "0.0.0";
 
     private static readonly string configFile = Path.Combine(AppContext.BaseDirectory, "config.json");
 
@@ -433,7 +441,7 @@ public class Program
         try
         {
             string responseBody = await client.GetStringAsync(apiUrl);
-            var priceData = JsonSerializer.Deserialize<SteamMarketPrice>(responseBody);
+            var priceData = JsonSerializer.Deserialize(responseBody, SourceGenerationContext.Default.SteamMarketPrice);
 
             if (priceData?.Success == true && priceData.LowestPrice != null && priceData.MedianPrice != null)
             {
@@ -560,7 +568,7 @@ public class Program
             try
             {
                 string json = File.ReadAllText(configFile);
-                return JsonSerializer.Deserialize<RootConfig>(json);
+                return JsonSerializer.Deserialize(json, SourceGenerationContext.Default.RootConfig);
             }
             catch (Exception ex)
             {
@@ -575,7 +583,7 @@ public class Program
     {
         try
         {
-            string json = JsonSerializer.Serialize(config, new JsonSerializerOptions { WriteIndented = true });
+            string json = JsonSerializer.Serialize(config, SourceGenerationContext.Default.RootConfig);
             File.WriteAllText(configFile, json);
         }
         catch (Exception ex)

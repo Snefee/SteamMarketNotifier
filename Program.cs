@@ -398,7 +398,10 @@ public class Program
         Console.Clear();
         Console.WriteLine($"--- Last update: {DateTime.Now:HH:mm:ss} ---");
         Console.WriteLine($"Tracking item: {itemName.Replace("%20", " ").Replace("%7C", "|").Replace("%E2%98%85", "★")}");
-        Console.WriteLine($"{apiUrl}");
+
+        #if DEBUG
+            Console.WriteLine($"{apiUrl}");
+        #endif
 
         try
         {

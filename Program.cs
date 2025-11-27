@@ -57,9 +57,34 @@ public class Program
     private static bool isAlertSent = false;
 
     // === Application version ===
-    private static readonly string appVersion = "0.8.3";
+    private static readonly string appVersion = "0.8.5";
 
     private static readonly string configFile = Path.Combine(AppContext.BaseDirectory, "config.json");
+
+    private static readonly Dictionary<string, int> steamCurrencies = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
+    {
+        { "USD", 1 }, { "GBP", 2 }, { "EUR", 3 }, { "CHF", 4 }, { "RUB", 5 },
+        { "PLN", 6 }, { "BRL", 7 }, { "JPY", 8 }, { "NOK", 9 }, { "IDR", 10 },
+        { "MYR", 11 }, { "PHP", 12 }, { "SGD", 13 }, { "THB", 14 }, { "VND", 15 },
+        { "KRW", 16 }, { "UAH", 18 }, { "MXN", 19 }, { "CAD", 20 }, { "AUD", 21 },
+        { "NZD", 22 }, { "CNY", 23 }, { "INR", 24 }, { "CLP", 25 }, { "PEN", 26 },
+        { "COP", 27 }, { "ZAR", 28 }, { "HKD", 29 }, { "TWD", 30 }, { "SAR", 31 },
+        { "AED", 32 }, { "ILS", 35 }, { "KZT", 37 }, { "KWD", 38 }, { "QAR", 39 },
+        { "CRC", 40 }, { "UYU", 41 }
+    };
+
+    private static readonly Dictionary<int, string> currencyIdToCode = new Dictionary<int, string>();
+
+    static Program()
+    {
+        foreach (var entry in steamCurrencies)
+        {
+            if (!currencyIdToCode.ContainsKey(entry.Value))
+            {
+                currencyIdToCode.Add(entry.Value, entry.Key);
+            }
+        }
+    }
 
 
     public static async Task Main(string[] args)
@@ -111,7 +136,7 @@ public class Program
 
                 Console.WriteLine("\n\n--- Selected configuration ---");
                 Console.WriteLine($"Tracked Item: {itemName.Replace("%20", " ").Replace("%7C", "|").Replace("%E2%98%85", "★").Replace("%E2%84%A2", "™")}");
-                Console.WriteLine($"Currency Type: {currencyType}");
+                Console.WriteLine($"Currency: {currencyIdToCode.GetValueOrDefault(currencyType, "Unknown/Not Set")}");
                 Console.WriteLine($"Ntfy Topic: {ntfyTopic}");
                 Console.WriteLine($"Price Rise Threshold: {priceRiseThreshold}");
                 Console.WriteLine($"Price Drop Threshold: {priceDropThreshold}");
@@ -139,8 +164,10 @@ public class Program
                 {
                     // Enable configuration mode
                     Console.Clear();
-                    Console.WriteLine($"--- Configuring Preset {activePreset} ---");
-                    Console.WriteLine("(Press ESC at any time to cancel changes)");
+                    Console.ForegroundColor = ConsoleColor.Yellow;
+                    Console.WriteLine($"--- Configuring Preset {activePreset} ---\n");
+                    Console.WriteLine("Press ESC at any time to cancel changes\n");
+                    Console.ForegroundColor = ConsoleColor.Gray;
 
                     // Create a temporary copy of the preset. 
                     var originalPreset = config.Presets[activePreset - 1];
@@ -190,7 +217,7 @@ public class Program
             var newRootConfig = new RootConfig { ActivePreset = 1 };
             for (int i = 0; i < 5; i++)
             {
-                newRootConfig.Presets.Add(new PresetConfig { ItemName = "Not Set" });
+                newRootConfig.Presets.Add(new PresetConfig { ItemName = "Not Set", CurrencyType = 1 });
             }
 
             var firstPreset = newRootConfig.Presets[0];
@@ -264,12 +291,12 @@ public class Program
         // Configure Currency
         while (true)
         {
-            Console.WriteLine("--- Choose your preffered currency ---");
-            Console.WriteLine("Input currency type (1-10): ");
-            Console.WriteLine("1. USD (default)\n2. GBP\n3. EUR\n4. CHF\n5. RUB\n6. PLN\n7. BRL\n8. JPY\n9. NOK\n10. AED");
+            Console.WriteLine("\n--- Choose your preferred currency ---");
+            Console.WriteLine("Enter the 3-letter currency code (e.g., USD, EUR, JPY).");
+            Console.WriteLine("For a full list of supported currencies, see: https://partner.steamgames.com/doc/store/pricing/currencies");
 
             string currencyInput = ReadLineWithCancel();
-            if (int.TryParse(currencyInput, out int selectedCurrency) && selectedCurrency >= 1 && selectedCurrency <= 10)
+            if (steamCurrencies.TryGetValue(currencyInput, out int selectedCurrency))
             {
                 presetToConfigure.CurrencyType = selectedCurrency;
                 break;
@@ -277,7 +304,7 @@ public class Program
             else
             {
                 Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine("Wrong input. Input a number between 1 to 10.");
+                Console.WriteLine("Invalid currency code. Please enter a valid 3-letter code.");
                 Console.ResetColor();
             }
         }
@@ -285,7 +312,7 @@ public class Program
         // Configure Ntfy.sh topic
         while (true)
         {
-            Console.WriteLine("--- Set your Ntfy topic ID for notifications ---");
+            Console.WriteLine("\n--- Set your Ntfy topic ID for notifications ---");
             Console.WriteLine("If you don't have one, you check how to make it here: https://github.com/Snefee/SteamMarketNotifier/wiki/NTFY-Setup");
             Console.WriteLine("Or leave it empty and press enter to skip notifications.");
 
@@ -311,7 +338,7 @@ public class Program
         // Configure Price Alerts if Ntfy is enabled
         if (!string.IsNullOrEmpty(presetToConfigure.NtfyTopic))
         {
-            Console.WriteLine("--- Configure Price Alert ---");
+            Console.WriteLine("\n--- Configure Price Alert ---");
             while (true)
             {
                 Console.Write("Enter price rise threshold (ex. 08,50) or press enter to skip: ");
@@ -397,7 +424,7 @@ public class Program
     {
         Console.Clear();
         Console.WriteLine($"--- Last update: {DateTime.Now:HH:mm:ss} ---");
-        Console.WriteLine($"Tracking item: {itemName.Replace("%20", " ").Replace("%7C", "|").Replace("%E2%98%85", "★")}");
+        Console.WriteLine($"Tracking item: {itemName.Replace("%20", " ").Replace("%7C", "|").Replace("%E2%98%85", "★").Replace("%E2%84%A2", "™")}");
 
         #if DEBUG
             Console.WriteLine($"{apiUrl}");

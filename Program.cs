@@ -279,8 +279,15 @@ public class Program
                     Console.ForegroundColor = ConsoleColor.Black;
                 }
 
-                string currentValue = GetValueForOption(i, presetToConfigure);
-                Console.WriteLine($"{menuOptions[i],-25}: {currentValue}");
+                if (i == menuOptions.Length - 1)
+                {
+                    Console.WriteLine(menuOptions[i]);
+                }
+                else
+                {
+                    string currentValue = GetValueForOption(i, presetToConfigure);
+                    Console.WriteLine($"{menuOptions[i],-25}: {currentValue}");
+                }
 
                 Console.ResetColor();
             }

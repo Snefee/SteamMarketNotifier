@@ -171,13 +171,6 @@ public class Program
                 else if (keyInfo.Key == ConsoleKey.C)
                 {
                     // Enable configuration mode
-                    Console.Clear();
-                    Console.ForegroundColor = ConsoleColor.Yellow;
-                    Console.WriteLine($"--- Configuring Preset {activePreset} ---\n");
-                    Console.WriteLine("Press ESC at any time to cancel changes\n");
-                    Console.ForegroundColor = ConsoleColor.Gray;
-
-                    // Create a temporary copy of the preset. 
                     var originalPreset = config.Presets[activePreset - 1];
                     var tempPreset = new PresetConfig
                     {
@@ -191,7 +184,7 @@ public class Program
                     try
                     {
                         // Pass the temporary object to the configuration method
-                        ConfigurePresetDetails(tempPreset);
+                        ConfigurePresetDetails(tempPreset, activePreset);
 
                         config.Presets[activePreset - 1] = tempPreset;
                         SaveConfig(config);
@@ -231,7 +224,7 @@ public class Program
             var firstPreset = newRootConfig.Presets[0];
             try
             {
-                ConfigurePresetDetails(firstPreset);
+                ConfigurePresetDetails(firstPreset, 1);
                 SaveConfig(newRootConfig);
                 Console.WriteLine("Configuration saved!");
             }
@@ -265,129 +258,213 @@ public class Program
         }
     }
 
-    private static void ConfigurePresetDetails(PresetConfig presetToConfigure)
+    private static void ConfigurePresetDetails(PresetConfig presetToConfigure, int presetNumber)
     {
-        // Configure Item Name
+        int selectedOption = 0;
+        string[] menuOptions = { "Item Name", "Currency", "Ntfy Topic", "Price Rise Threshold", "Price Drop Threshold", "Save and Exit" };
+
         while (true)
         {
-            Console.WriteLine("Write the exact item name or paste a full Steam Market link:");
-            string itemInput = ReadLineWithCancel();
+            Console.Clear();
+            Console.ForegroundColor = ConsoleColor.Yellow;
+            Console.WriteLine($"--- Configuring Preset {presetNumber} ---");
+            Console.WriteLine("Use Up/Down arrows [or W/S] to navigate, Enter to edit, ESC to cancel.\n");
+            Console.ResetColor();
 
-            if (!string.IsNullOrEmpty(itemInput))
+            for (int i = 0; i < menuOptions.Length; i++)
             {
-                const string urlPrefix = "https://steamcommunity.com/market/listings/730/";
-                if (itemInput.StartsWith(urlPrefix, StringComparison.OrdinalIgnoreCase))
+                if (i == selectedOption)
                 {
-                    // Input is a URL, extract the item name.
-                    presetToConfigure.ItemName = itemInput.Substring(urlPrefix.Length);
+                    Console.BackgroundColor = ConsoleColor.Cyan;
+                    Console.ForegroundColor = ConsoleColor.Black;
                 }
-                else
-                {
-                    // Input is a name, encode it manually.
-                    presetToConfigure.ItemName = itemInput.Replace(" ", "%20").Replace("|", "%7C").Replace("★", "%E2%98%85").Replace("™", "%E2%84%A2");
-                }
-                break;
-            }
-            else
-            {
-                Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine("Item name cannot be empty. Please try again.");
+
+                string currentValue = GetValueForOption(i, presetToConfigure);
+                Console.WriteLine($"{menuOptions[i],-25}: {currentValue}");
+
                 Console.ResetColor();
             }
-        }
 
-        // Configure Currency
-        while (true)
-        {
-            Console.WriteLine("\n--- Choose your preferred currency ---");
-            Console.WriteLine("Enter the 3-letter currency code (e.g., USD, EUR, JPY).");
-            Console.WriteLine("For a full list of supported currencies, see: https://partner.steamgames.com/doc/store/pricing/currencies");
+            var keyInfo = Console.ReadKey(true);
 
-            string currencyInput = ReadLineWithCancel();
-            if (steamCurrencies.TryGetValue(currencyInput, out int selectedCurrency))
+            switch (keyInfo.Key)
             {
-                presetToConfigure.CurrencyType = selectedCurrency;
-                break;
-            }
-            else
-            {
-                Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine("Invalid currency code. Please enter a valid 3-letter code.");
-                Console.ResetColor();
-            }
-        }
-
-        // Configure Ntfy.sh topic
-        while (true)
-        {
-            Console.WriteLine("\n--- Set your Ntfy topic ID for notifications ---");
-            Console.WriteLine("If you don't have one, you check how to make it here: https://github.com/Snefee/SteamMarketNotifier/wiki/NTFY-Setup");
-            Console.WriteLine("Or leave it empty and press enter to skip notifications.");
-
-            string ntfyInput = ReadLineWithCancel();
-            if (string.IsNullOrEmpty(ntfyInput))
-            {
-                presetToConfigure.NtfyTopic = string.Empty;
-                break;
-            }
-            else if (ntfyInput.Length >= 5 && ntfyInput.Length <= 64)
-            {
-                presetToConfigure.NtfyTopic = ntfyInput.Trim();
-                break;
-            }
-            else
-            {
-                Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine("Wrong input. Input a valid token ID (5-64 characters).");
-                Console.ResetColor();
-            }
-        }
-
-        // Configure Price Alerts if Ntfy is enabled
-        if (!string.IsNullOrEmpty(presetToConfigure.NtfyTopic))
-        {
-            Console.WriteLine("\n--- Configure Price Alert ---");
-            while (true)
-            {
-                Console.Write("Enter price rise threshold (ex. 08,50) or press enter to skip: ");
-                string priceRiseInput = ReadLineWithCancel().Replace(',', '.');
-
-                if (string.IsNullOrEmpty(priceRiseInput))
-                {
-                    presetToConfigure.PriceRiseThreshold = 0.0f;
-                }
-                else if (float.TryParse(priceRiseInput, NumberStyles.Any, CultureInfo.InvariantCulture, out float riseThreshold) && riseThreshold > 0)
-                {
-                    presetToConfigure.PriceRiseThreshold = riseThreshold;
-                }
-                else
-                {
-                    Console.ForegroundColor = ConsoleColor.Red;
-                    Console.WriteLine("Wrong input. Enter a positive number.");
-                    Console.ResetColor();
-                    continue;
-                }
-
-                Console.Write("Enter price drop threshold (ex. 05,23) or press enter to skip: ");
-                string priceDropInput = ReadLineWithCancel().Replace(',', '.');
-
-                if (string.IsNullOrEmpty(priceDropInput))
-                {
-                    presetToConfigure.PriceDropThreshold = 0.0f;
+                case ConsoleKey.UpArrow:
+                    selectedOption = (selectedOption == 0) ? menuOptions.Length - 1 : selectedOption - 1;
                     break;
-                }
-                else if (float.TryParse(priceDropInput, NumberStyles.Any, CultureInfo.InvariantCulture, out float dropThreshold) && dropThreshold > 0)
-                {
-                    presetToConfigure.PriceDropThreshold = dropThreshold;
+                case ConsoleKey.DownArrow:
+                    selectedOption = (selectedOption == menuOptions.Length - 1) ? 0 : selectedOption + 1;
                     break;
-                }
-                else
-                {
-                    Console.ForegroundColor = ConsoleColor.Red;
-                    Console.WriteLine("Wrong input. Enter a positive number.");
-                    Console.ResetColor();
-                }
+                case ConsoleKey.W:
+                    selectedOption = (selectedOption == 0) ? menuOptions.Length - 1 : selectedOption - 1;
+                    break;
+                case ConsoleKey.S:
+                    selectedOption = (selectedOption == menuOptions.Length - 1) ? 0 : selectedOption + 1;
+                    break;
+                case ConsoleKey.Enter:
+                    if (selectedOption == menuOptions.Length - 1) // Save and Exit
+                    {
+                        return;
+                    }
+                    EditOption(selectedOption, presetToConfigure);
+                    break;
+                case ConsoleKey.Escape:
+                    throw new OperationCanceledException();
             }
+        }
+    }
+
+    private static string GetValueForOption(int optionIndex, PresetConfig preset)
+    {
+        switch (optionIndex)
+        {
+            case 0: return preset.ItemName.Replace("%20", " ").Replace("%7C", "|").Replace("%E2%98%85", "★").Replace("%E2%84%A2", "™");
+            case 1: return currencyIdToCode.GetValueOrDefault(preset.CurrencyType, "Not Set");
+            case 2: return string.IsNullOrEmpty(preset.NtfyTopic) ? "Not Set" : preset.NtfyTopic;
+            case 3: return preset.PriceRiseThreshold == 0.0f ? "Not Set" : preset.PriceRiseThreshold.ToString(CultureInfo.InvariantCulture);
+            case 4: return preset.PriceDropThreshold == 0.0f ? "Not Set" : preset.PriceDropThreshold.ToString(CultureInfo.InvariantCulture);
+            default: return "";
+        }
+    }
+
+    private static void EditOption(int optionIndex, PresetConfig presetToConfigure)
+    {
+        Console.Clear();
+        Console.ForegroundColor = ConsoleColor.Yellow;
+        Console.WriteLine($"--- Editing {((string[])["Item Name", "Currency", "Ntfy Topic", "Price Rise Threshold", "Price Drop Threshold"])[optionIndex]} ---\n");
+        Console.ResetColor();
+
+        try
+        {
+            switch (optionIndex)
+            {
+                case 0: EditItemName(presetToConfigure); break;
+                case 1: EditCurrency(presetToConfigure); break;
+                case 2: EditNtfyTopic(presetToConfigure); break;
+                case 3: EditPriceRiseThreshold(presetToConfigure); break;
+                case 4: EditPriceDropThreshold(presetToConfigure); break;
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // Do nothing, just return to the main config menu
+        }
+    }
+
+    private static void EditItemName(PresetConfig presetToConfigure)
+    {
+        Console.WriteLine("Write the exact item name or paste a full Steam Market link:");
+        string itemInput = ReadLineWithCancel();
+
+        if (!string.IsNullOrEmpty(itemInput))
+        {
+            const string urlPrefix = "https://steamcommunity.com/market/listings/730/";
+            if (itemInput.StartsWith(urlPrefix, StringComparison.OrdinalIgnoreCase))
+            {
+                presetToConfigure.ItemName = itemInput.Substring(urlPrefix.Length);
+            }
+            else
+            {
+                presetToConfigure.ItemName = itemInput.Replace(" ", "%20").Replace("|", "%7C").Replace("★", "%E2%98%85").Replace("™", "%E2%84%A2");
+            }
+        }
+        else
+        {
+            Console.ForegroundColor = ConsoleColor.Red;
+            Console.WriteLine("Item name cannot be empty. Press any key to try again.");
+            Console.ResetColor();
+            Console.ReadKey(true);
+            EditItemName(presetToConfigure); // Retry
+        }
+    }
+
+    private static void EditCurrency(PresetConfig presetToConfigure)
+    {
+        Console.WriteLine("Enter the 3-letter currency code (e.g., USD, EUR, JPY).");
+        Console.WriteLine("For a full list of supported currencies, see: https://partner.steamgames.com/doc/store/pricing/currencies");
+
+        string currencyInput = ReadLineWithCancel();
+        if (steamCurrencies.TryGetValue(currencyInput, out int selectedCurrency))
+        {
+            presetToConfigure.CurrencyType = selectedCurrency;
+        }
+        else
+        {
+            Console.ForegroundColor = ConsoleColor.Red;
+            Console.WriteLine("Invalid currency code. Press any key to try again.");
+            Console.ResetColor();
+            Console.ReadKey(true);
+            EditCurrency(presetToConfigure); // Retry
+        }
+    }
+
+    private static void EditNtfyTopic(PresetConfig presetToConfigure)
+    {
+        Console.WriteLine("Enter your Ntfy topic ID (5-64 characters), or leave empty to disable notifications.");
+        Console.WriteLine("Wiki: https://github.com/Snefee/SteamMarketNotifier/wiki/NTFY-Setup");
+
+        string ntfyInput = ReadLineWithCancel();
+        if (string.IsNullOrEmpty(ntfyInput))
+        {
+            presetToConfigure.NtfyTopic = string.Empty;
+        }
+        else if (ntfyInput.Length >= 5 && ntfyInput.Length <= 64)
+        {
+            presetToConfigure.NtfyTopic = ntfyInput.Trim();
+        }
+        else
+        {
+            Console.ForegroundColor = ConsoleColor.Red;
+            Console.WriteLine("Invalid topic ID length. Press any key to try again.");
+            Console.ResetColor();
+            Console.ReadKey(true);
+            EditNtfyTopic(presetToConfigure); // Retry
+        }
+    }
+
+    private static void EditPriceRiseThreshold(PresetConfig presetToConfigure)
+    {
+        Console.Write("Enter price rise threshold (e.g., 8.50) or press Enter to disable: ");
+        string priceRiseInput = ReadLineWithCancel().Replace(',', '.');
+
+        if (string.IsNullOrEmpty(priceRiseInput))
+        {
+            presetToConfigure.PriceRiseThreshold = 0.0f;
+        }
+        else if (float.TryParse(priceRiseInput, NumberStyles.Any, CultureInfo.InvariantCulture, out float riseThreshold) && riseThreshold > 0)
+        {
+            presetToConfigure.PriceRiseThreshold = riseThreshold;
+        }
+        else
+        {
+            Console.ForegroundColor = ConsoleColor.Red;
+            Console.WriteLine("Invalid input. Enter a positive number. Press any key to try again.");
+            Console.ResetColor();
+            Console.ReadKey(true);
+            EditPriceRiseThreshold(presetToConfigure); // Retry
+        }
+    }
+
+    private static void EditPriceDropThreshold(PresetConfig presetToConfigure)
+    {
+        Console.Write("Enter price drop threshold (e.g., 5.23) or press Enter to disable: ");
+        string priceDropInput = ReadLineWithCancel().Replace(',', '.');
+
+        if (string.IsNullOrEmpty(priceDropInput))
+        {
+            presetToConfigure.PriceDropThreshold = 0.0f;
+        }
+        else if (float.TryParse(priceDropInput, NumberStyles.Any, CultureInfo.InvariantCulture, out float dropThreshold) && dropThreshold > 0)
+        {
+            presetToConfigure.PriceDropThreshold = dropThreshold;
+        }
+        else
+        {
+            Console.ForegroundColor = ConsoleColor.Red;
+            Console.WriteLine("Invalid input. Enter a positive number. Press any key to try again.");
+            Console.ResetColor();
+            Console.ReadKey(true);
+            EditPriceDropThreshold(presetToConfigure); // Retry
         }
     }
 

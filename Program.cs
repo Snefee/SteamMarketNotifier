@@ -68,6 +68,7 @@ public class Program
     private static readonly string appVersion = Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "0.0.0";
 
     private static readonly string configFile = Path.Combine(AppContext.BaseDirectory, "config.json");
+    private static string? _tempLogFilePath;
 
     private static readonly Dictionary<string, int> steamCurrencies = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
     {
@@ -238,22 +239,43 @@ public class Program
             goto MainMenu;
         }
 
-        while (true)
+        try
         {
-            await FetchAndDisplayPrice();
-            Console.WriteLine($"\nNext update in 5 minutes...\nPress ESC to return to menu");
+            _tempLogFilePath = Path.GetTempFileName();
+            await File.WriteAllTextAsync(_tempLogFilePath, "Timestamp,LowestPrice,MedianPrice,Volume\n");
 
-            for (int i = 0; i < 3000; i++)
+            while (true)
             {
-                if (Console.KeyAvailable)
+                await FetchAndDisplayPrice();
+                Console.WriteLine($"\nNext update in 5 minutes...\nPress E to export data, ESC to return to menu");
+
+                for (int i = 0; i < 3000; i++)
                 {
-                    var keyInfo = Console.ReadKey(true);
-                    if (keyInfo.Key == ConsoleKey.Escape)
+                    if (Console.KeyAvailable)
                     {
-                        goto MainMenu;
+                        var keyInfo = Console.ReadKey(true);
+                        if (keyInfo.Key == ConsoleKey.Escape)
+                        {
+                            goto MainMenu;
+                        }
+                        else if (keyInfo.Key == ConsoleKey.E)
+                        {
+                            ExportDataToCsv();
+                            Console.ForegroundColor = ConsoleColor.Green;
+                            Console.WriteLine("Data exported successfully!");
+                            Console.ResetColor();
+                        }
                     }
+                    await Task.Delay(100);
                 }
-                await Task.Delay(100);
+            }
+        }
+        finally
+        {
+            if (_tempLogFilePath != null && File.Exists(_tempLogFilePath))
+            {
+                File.Delete(_tempLogFilePath);
+                _tempLogFilePath = null;
             }
         }
     }
@@ -524,11 +546,15 @@ public class Program
 
         try
         {
-            string responseBody = await client.GetStringAsync(apiUrl);
+            using var request = new HttpRequestMessage(HttpMethod.Get, apiUrl);
+            using var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
+            response.EnsureSuccessStatusCode();
+            string responseBody = await response.Content.ReadAsStringAsync();
             var priceData = JsonSerializer.Deserialize(responseBody, SourceGenerationContext.Default.SteamMarketPrice);
 
             if (priceData?.Success == true && priceData.LowestPrice != null && priceData.MedianPrice != null)
             {
+                await LogPriceUpdate(priceData);
                 float currentLowest = ParsePrice(priceData.LowestPrice);
                 float currentMedian = ParsePrice(priceData.MedianPrice);
 
@@ -582,13 +608,71 @@ public class Program
         }
     }
 
+    private static async Task LogPriceUpdate(SteamMarketPrice priceData)
+    {
+        if (_tempLogFilePath == null || priceData.LowestPrice == null || priceData.MedianPrice == null || priceData.Volume == null)
+        {
+            return;
+        }
+
+        try
+        {
+            string timestamp = DateTime.UtcNow.ToString("o");
+            string lowestPrice = ParsePrice(priceData.LowestPrice).ToString(CultureInfo.InvariantCulture);
+            string medianPrice = ParsePrice(priceData.MedianPrice).ToString(CultureInfo.InvariantCulture);
+            string volume = priceData.Volume.Replace(",", "");
+
+            string csvLine = $"{timestamp},{lowestPrice},{medianPrice},{volume}\n";
+
+            await File.AppendAllTextAsync(_tempLogFilePath, csvLine);
+        }
+        catch (Exception ex)
+        {
+            Console.ForegroundColor = ConsoleColor.DarkYellow;
+            Console.WriteLine($"Failed to write to log file: {ex.Message}");
+            Console.ResetColor();
+        }
+    }
+
+    private static void ExportDataToCsv()
+    {
+        if (_tempLogFilePath == null || !File.Exists(_tempLogFilePath))
+        {
+            Console.ForegroundColor = ConsoleColor.DarkYellow;
+            Console.WriteLine("No log data to export.");
+            Console.ResetColor();
+            return;
+        }
+
+        try
+        {
+            string sanitizedItemName = itemName.Replace("%20", "").Replace("%7C", "").Replace("%E2%98%85", "").Replace("%E2%84%A2", "");
+            string timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
+            string fileName = $"MarketLog_{sanitizedItemName}_{timestamp}.csv";
+            string finalPath = Path.Combine(AppContext.BaseDirectory, fileName);
+
+            File.Copy(_tempLogFilePath, finalPath, true);
+
+            Console.ForegroundColor = ConsoleColor.Green;
+            Console.WriteLine($"\nData exported successfully to: {fileName}");
+            Console.ResetColor();
+        }
+        catch (Exception ex)
+        {
+            Console.ForegroundColor = ConsoleColor.DarkYellow;
+            Console.WriteLine($"\nFailed to export data: {ex.Message}");
+            Console.ResetColor();
+        }
+    }
+
+
     // === Send notification using ntfy.sh service ===
     private static async Task SendNtfyNotification(string message)
     {
         try
         {
             var content = new StringContent(message, Encoding.UTF8, "text/plain");
-            var request = new HttpRequestMessage(HttpMethod.Post, $"https://ntfy.sh/{ntfyTopic}")
+            using var request = new HttpRequestMessage(HttpMethod.Post, $"https://ntfy.sh/{ntfyTopic}")
             {
                 Content = content
             };
@@ -596,7 +680,7 @@ public class Program
             request.Headers.Add("Priority", "high");
             request.Headers.Add("Tags", "tada");
 
-            var response = await client.SendAsync(request);
+            using var response = await client.SendAsync(request);
             if (response.IsSuccessStatusCode)
             {
                 Console.WriteLine("Notification sent successfuly!");

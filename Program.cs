@@ -144,7 +144,7 @@ public class Program
                 }
 
                 Console.WriteLine("\n\n--- Selected configuration ---");
-                Console.WriteLine($"Tracked Item: {itemName.Replace("%20", " ").Replace("%7C", "|").Replace("%E2%98%85", "★").Replace("%E2%84%A2", "™")}");
+                Console.WriteLine($"Tracked Item: {itemName.Replace("%20", " ").Replace("%7C", "|").Replace("%E2%98%85", "★").Replace("%E2%84%A2", "™").Replace("%28", "(").Replace("%29", ")")}");
                 Console.WriteLine($"Currency: {currencyIdToCode.GetValueOrDefault(currencyType, "Unknown/Not Set")}");
                 Console.WriteLine($"Ntfy Topic: {ntfyTopic}");
                 Console.WriteLine($"Price Rise Threshold: {priceRiseThreshold}");
@@ -347,7 +347,7 @@ public class Program
     {
         switch (optionIndex)
         {
-            case 0: return preset.ItemName.Replace("%20", " ").Replace("%7C", "|").Replace("%E2%98%85", "★").Replace("%E2%84%A2", "™");
+            case 0: return preset.ItemName.Replace("%20", " ").Replace("%7C", "|").Replace("%E2%98%85", "★").Replace("%E2%84%A2", "™").Replace("%28", "(").Replace("%29", ")");
             case 1: return currencyIdToCode.GetValueOrDefault(preset.CurrencyType, "Not Set");
             case 2: return string.IsNullOrEmpty(preset.NtfyTopic) ? "Not Set" : preset.NtfyTopic;
             case 3: return preset.PriceRiseThreshold == 0.0f ? "Not Set" : preset.PriceRiseThreshold.ToString(CultureInfo.InvariantCulture);
@@ -394,7 +394,7 @@ public class Program
             }
             else
             {
-                presetToConfigure.ItemName = itemInput.Replace(" ", "%20").Replace("|", "%7C").Replace("★", "%E2%98%85").Replace("™", "%E2%84%A2");
+                presetToConfigure.ItemName = itemInput.Replace(" ", "%20").Replace("|", "%7C").Replace("★", "%E2%98%85").Replace("™", "%E2%84%A2").Replace("(", "%28").Replace(")", "%29");
             }
         }
         else
@@ -538,7 +538,7 @@ public class Program
     {
         Console.Clear();
         Console.WriteLine($"--- Last update: {DateTime.Now:HH:mm:ss} ---");
-        Console.WriteLine($"Tracking item: {itemName.Replace("%20", " ").Replace("%7C", "|").Replace("%E2%98%85", "★").Replace("%E2%84%A2", "™")}");
+        Console.WriteLine($"Tracking item: {itemName.Replace("%20", " ").Replace("%7C", "|").Replace("%E2%98%85", "★").Replace("%E2%84%A2", "™").Replace("%28", "(").Replace("%29", ")")}");
 
         #if DEBUG
             Console.WriteLine($"{apiUrl}");
@@ -646,7 +646,7 @@ public class Program
 
         try
         {
-            string sanitizedItemName = itemName.Replace("%20", "").Replace("%7C", "").Replace("%E2%98%85", "").Replace("%E2%84%A2", "");
+            string sanitizedItemName = itemName.Replace("%20", "").Replace("%7C", "").Replace("%E2%98%85", "").Replace("%E2%84%A2", "").Replace("%28", "(").Replace("%29", ")");
             string timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
             string fileName = $"MarketLog_{sanitizedItemName}_{timestamp}.csv";
             string finalPath = Path.Combine(AppContext.BaseDirectory, fileName);

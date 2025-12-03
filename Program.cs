@@ -213,9 +213,6 @@ public class Program
             }
         else
         {
-            // First time setup
-            Console.WriteLine("--- Welcome to Steam Market Notifier! ---");
-
             var newRootConfig = new RootConfig { ActivePreset = 1 };
             for (int i = 0; i < 5; i++)
             {
@@ -225,7 +222,7 @@ public class Program
             var firstPreset = newRootConfig.Presets[0];
             try
             {
-                ConfigurePresetDetails(firstPreset, 1);
+                ConfigurePresetDetails(firstPreset, 1, true);
                 SaveConfig(newRootConfig);
                 Console.WriteLine("Configuration saved!");
             }
@@ -280,7 +277,7 @@ public class Program
         }
     }
 
-    private static void ConfigurePresetDetails(PresetConfig presetToConfigure, int presetNumber)
+    private static void ConfigurePresetDetails(PresetConfig presetToConfigure, int presetNumber, bool isFirstRun = false)
     {
         int selectedOption = 0;
         string[] menuOptions = { "Item Name", "Currency", "Ntfy Topic", "Price Rise Threshold", "Price Drop Threshold", "Save and Exit" };
@@ -289,6 +286,15 @@ public class Program
         {
             Console.Clear();
             Console.ForegroundColor = ConsoleColor.Yellow;
+
+            if (isFirstRun)
+            {
+                Console.ForegroundColor = ConsoleColor.Green;
+                Console.WriteLine("Welcome to the Steam Market Notifier!");
+                Console.WriteLine("Please configure your first preset.\n");
+                Console.ForegroundColor = ConsoleColor.Yellow;
+            }
+
             Console.WriteLine($"--- Configuring Preset {presetNumber} ---");
             Console.WriteLine("Use Up/Down arrows [or W/S] to navigate, Enter to edit, ESC to cancel.\n");
             Console.ResetColor();
@@ -336,6 +342,7 @@ public class Program
                         return;
                     }
                     EditOption(selectedOption, presetToConfigure);
+                    isFirstRun = false;
                     break;
                 case ConsoleKey.Escape:
                     throw new OperationCanceledException();

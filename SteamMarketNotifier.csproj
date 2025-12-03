@@ -6,7 +6,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <Company>Snefee</Company>
-    <Version>0.8.8</Version>
+    <Version>0.8.8.1</Version>
   </PropertyGroup>
 
 </Project>

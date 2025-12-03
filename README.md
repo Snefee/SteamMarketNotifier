@@ -2,9 +2,12 @@
 A C# app that you can use to track prices of chosen items from the Steam market <br>
 **Check the [Wiki](https://github.com/Snefee/SteamMarketNotifier/wiki)**
 ## Current Features
-- Track current price of chosen items [tracking only one item at a time is currently supported]
-- Set your designated currency [currently supported currencies are: USD, GBP, EUR, CHF, RUB, PLN, BRL, JPY, NOK, AED]
-- Get notifications on your phone when the price goes over the selected threshold [Ntfy app is required on the phone]
+- Track price changes of items from the Steam Market [tracking only one item at a time is currently supported]
+- Set your designated currency [all Steam supported currencies are available, for list of supported currencies click [here](https://partner.steamgames.com/doc/store/pricing/currencies)]
+- Get notifications on your phone when the price goes over or below the selected thresholds [Ntfy app is required on the phone]
+- Set up to five presets, so you won't have to reconfigure everything every time you want to track different items.
+- Simple user friendly GUI
+- Export tracked item's price history from a single tracking session into a CSV file
 
 <br>
 
@@ -14,3 +17,4 @@ A C# app that you can use to track prices of chosen items from the Steam market 
 - Add the ability to check the price history since the item has been tracked ✅ ~[and to export as CSV]~
 - ✅ ~Add presets [allow the user to set the item, currency and price threshold and save them as presets]~
 - ✅ ~Add GUI~
+

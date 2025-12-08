@@ -53,6 +53,9 @@ public class Program
     private static int currencyType = 1; // Default currency = USD
     private static string apiUrl => $"https://steamcommunity.com/market/priceoverview/?currency={currencyType}&appid=730&market_hash_name={itemName}";
 
+    // Tracking update interval in seconds
+    const int updateIntervalSeconds = 300;
+
     private static int activePreset = 1;
     private static float priceRiseThreshold = 0.0f;
     private static float priceDropThreshold = 0.0f;
@@ -244,27 +247,37 @@ public class Program
             while (true)
             {
                 await FetchAndDisplayPrice();
-                Console.WriteLine($"\nNext update in 5 minutes...\nPress E to export data, ESC to return to menu");
+                Console.WriteLine($"\nPress E to export data, ESC to return to menu");
 
-                for (int i = 0; i < 3000; i++)
+                int remainingSeconds = updateIntervalSeconds;
+
+                while (remainingSeconds > 0)
                 {
-                    if (Console.KeyAvailable)
+                    TimeSpan timeSpan = TimeSpan.FromSeconds(remainingSeconds);
+                    Console.Write($"\rNext update in: {timeSpan:mm\\:ss}");
+
+                    for (int i = 0; i < 10; i++)
                     {
-                        var keyInfo = Console.ReadKey(true);
-                        if (keyInfo.Key == ConsoleKey.Escape)
+                        await Task.Delay(100);
+                        if (Console.KeyAvailable)
                         {
-                            goto MainMenu;
-                        }
-                        else if (keyInfo.Key == ConsoleKey.E)
-                        {
-                            ExportDataToCsv();
-                            Console.ForegroundColor = ConsoleColor.Green;
-                            Console.WriteLine("Data exported successfully!");
-                            Console.ResetColor();
+                            var keyInfo = Console.ReadKey(true);
+                            if (keyInfo.Key == ConsoleKey.Escape)
+                            {
+                                goto MainMenu;
+                            }
+                            else if (keyInfo.Key == ConsoleKey.E)
+                            {
+                                ExportDataToCsv();
+                                Console.ForegroundColor = ConsoleColor.Green;
+                                Console.WriteLine("Data exported successfully!");
+                                Console.ResetColor();
+                            }
                         }
                     }
-                    await Task.Delay(100);
+                    remainingSeconds--;
                 }
+                Console.Write(new string(' ', Console.WindowWidth - 1) + "\r");
             }
         }
         finally

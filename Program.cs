@@ -157,7 +157,7 @@ public class Program
                 Console.ForegroundColor = ConsoleColor.Yellow;
                 Console.WriteLine("\nUse Left/Right arrow keys [or A/D] to switch presets.");
                 Console.WriteLine("Press C to change selected preset's configuration");
-                Console.WriteLine("Press Enter to start tracking.");
+                Console.WriteLine("Press Enter/Space to start tracking.");
                 Console.ForegroundColor = ConsoleColor.Gray;
                 Console.WriteLine($"App Version: {appVersion}");
                 Console.ResetColor();
@@ -206,7 +206,7 @@ public class Program
                         await Task.Delay(1000);
                     }
                 }
-                else if (keyInfo.Key == ConsoleKey.Enter)
+                else if (keyInfo.Key == ConsoleKey.Enter || keyInfo.Key == ConsoleKey.Spacebar)
                 {
                     // Save the last selected preset before starting
                     config.ActivePreset = activePreset;
@@ -247,6 +247,8 @@ public class Program
             while (true)
             {
                 await FetchAndDisplayPrice();
+
+                Console.ForegroundColor = ConsoleColor.Yellow;
                 Console.WriteLine($"\nPress E to export data, ESC to return to menu");
 
                 int remainingSeconds = updateIntervalSeconds;
@@ -264,6 +266,7 @@ public class Program
                             var keyInfo = Console.ReadKey(true);
                             if (keyInfo.Key == ConsoleKey.Escape)
                             {
+                                Console.ResetColor();
                                 goto MainMenu;
                             }
                             else if (keyInfo.Key == ConsoleKey.E)
@@ -277,6 +280,7 @@ public class Program
                     }
                     remainingSeconds--;
                 }
+                Console.ResetColor();
                 Console.Write(new string(' ', Console.WindowWidth - 1) + "\r");
             }
         }
@@ -309,7 +313,7 @@ public class Program
             }
 
             Console.WriteLine($"--- Configuring Preset {presetNumber} ---");
-            Console.WriteLine("Use Up/Down arrows [or W/S] to navigate, Enter to edit, ESC to cancel.\n");
+            Console.WriteLine("Use Up/Down arrows [or W/S] to navigate, Enter/Space to edit, ESC to cancel.\n");
             Console.ResetColor();
 
             for (int i = 0; i < menuOptions.Length; i++)
@@ -350,6 +354,7 @@ public class Program
                     selectedOption = (selectedOption == menuOptions.Length - 1) ? 0 : selectedOption + 1;
                     break;
                 case ConsoleKey.Enter:
+                case ConsoleKey.Spacebar:
                     if (selectedOption == menuOptions.Length - 1) // Save and Exit
                     {
                         return;

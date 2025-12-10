@@ -275,6 +275,7 @@ public class Program
                                 Console.ForegroundColor = ConsoleColor.Green;
                                 Console.WriteLine("Data exported successfully!");
                                 Console.ResetColor();
+                                Console.ForegroundColor = ConsoleColor.Yellow;
                             }
                         }
                     }

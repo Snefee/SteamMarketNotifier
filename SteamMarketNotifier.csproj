@@ -6,7 +6,12 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <Company>Snefee</Company>
-    <Version>0.8.9.2</Version>
+    <Version>0.8.9.3</Version>
+    <ApplicationIcon>SteamMarketNotifier_Icon.ico</ApplicationIcon>
   </PropertyGroup>
+
+  <ItemGroup>
+    <Content Include="SteamMarketNotifier_Icon.ico" />
+  </ItemGroup>
 
 </Project>

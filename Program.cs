@@ -8,6 +8,7 @@ using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 using System.IO;
 using System.Reflection;
+using Microsoft.Toolkit.Uwp.Notifications;
 
 [JsonSourceGenerationOptions(WriteIndented = true)]
 [JsonSerializable(typeof(RootConfig))]
@@ -36,6 +37,7 @@ public class PresetConfig
     public string ItemName { get; set; } = string.Empty;
     public int CurrencyType { get; set; }
     public string NtfyTopic { get; set; } = string.Empty;
+    public bool UseWindowsNotifications { get; set; }
     public float PriceRiseThreshold { get; set; }
     public float PriceDropThreshold { get; set; }
 }
@@ -60,6 +62,7 @@ public class Program
     private static float priceRiseThreshold = 0.0f;
     private static float priceDropThreshold = 0.0f;
     private static string ntfyTopic = string.Empty;
+    private static bool useWindowsNotifications = false;
     private static bool isNtfyEnabled => !string.IsNullOrEmpty(ntfyTopic);
     private static string itemName = string.Empty;
 
@@ -121,6 +124,7 @@ public class Program
                     itemName = currentPresetConfig.ItemName;
                     currencyType = currentPresetConfig.CurrencyType;
                     ntfyTopic = currentPresetConfig.NtfyTopic;
+                    useWindowsNotifications = currentPresetConfig.UseWindowsNotifications;
                     priceRiseThreshold = currentPresetConfig.PriceRiseThreshold;
                     priceDropThreshold = currentPresetConfig.PriceDropThreshold;
                 }
@@ -150,6 +154,7 @@ public class Program
                 Console.WriteLine($"Tracked Item: {itemName.Replace("%20", " ").Replace("%7C", "|").Replace("%E2%98%85", "★").Replace("%E2%84%A2", "™").Replace("%28", "(").Replace("%29", ")")}");
                 Console.WriteLine($"Currency: {currencyIdToCode.GetValueOrDefault(currencyType, "Unknown/Not Set")}");
                 Console.WriteLine($"Ntfy Topic: {ntfyTopic}");
+                Console.WriteLine($"Windows Notifications: {(useWindowsNotifications ? "Enabled" : "Disabled")}");
                 Console.WriteLine($"Price Rise Threshold: {priceRiseThreshold}");
                 Console.WriteLine($"Price Drop Threshold: {priceDropThreshold}");
                 Console.WriteLine("-----------------------------------");
@@ -181,6 +186,7 @@ public class Program
                         ItemName = originalPreset.ItemName,
                         CurrencyType = originalPreset.CurrencyType,
                         NtfyTopic = originalPreset.NtfyTopic,
+                        UseWindowsNotifications = originalPreset.UseWindowsNotifications,
                         PriceRiseThreshold = originalPreset.PriceRiseThreshold,
                         PriceDropThreshold = originalPreset.PriceDropThreshold
                     };
@@ -298,7 +304,7 @@ public class Program
     private static void ConfigurePresetDetails(PresetConfig presetToConfigure, int presetNumber, bool isFirstRun = false)
     {
         int selectedOption = 0;
-        string[] menuOptions = { "Item Name", "Currency", "Ntfy Topic", "Price Rise Threshold", "Price Drop Threshold", "Save and Exit" };
+        string[] menuOptions = { "Item Name", "Currency", "Ntfy Topic", "Windows Notifications", "Price Rise Threshold", "Price Drop Threshold", "Save and Exit" };
 
         while (true)
         {
@@ -376,8 +382,9 @@ public class Program
             case 0: return preset.ItemName.Replace("%20", " ").Replace("%7C", "|").Replace("%E2%98%85", "★").Replace("%E2%84%A2", "™").Replace("%28", "(").Replace("%29", ")");
             case 1: return currencyIdToCode.GetValueOrDefault(preset.CurrencyType, "Not Set");
             case 2: return string.IsNullOrEmpty(preset.NtfyTopic) ? "Not Set" : preset.NtfyTopic;
-            case 3: return preset.PriceRiseThreshold == 0.0f ? "Not Set" : preset.PriceRiseThreshold.ToString(CultureInfo.InvariantCulture);
-            case 4: return preset.PriceDropThreshold == 0.0f ? "Not Set" : preset.PriceDropThreshold.ToString(CultureInfo.InvariantCulture);
+            case 3: return preset.UseWindowsNotifications ? "Enabled" : "Disabled";
+            case 4: return preset.PriceRiseThreshold == 0.0f ? "Not Set" : preset.PriceRiseThreshold.ToString(CultureInfo.InvariantCulture);
+            case 5: return preset.PriceDropThreshold == 0.0f ? "Not Set" : preset.PriceDropThreshold.ToString(CultureInfo.InvariantCulture);
             default: return "";
         }
     }
@@ -386,7 +393,7 @@ public class Program
     {
         Console.Clear();
         Console.ForegroundColor = ConsoleColor.Yellow;
-        Console.WriteLine($"--- Editing {((string[])["Item Name", "Currency", "Ntfy Topic", "Price Rise Threshold", "Price Drop Threshold"])[optionIndex]} ---\n");
+        Console.WriteLine($"--- Editing {((string[])["Item Name", "Currency", "Ntfy Topic", "Windows Notifications", "Price Rise Threshold", "Price Drop Threshold"])[optionIndex]} ---\n");
         Console.ResetColor();
 
         try
@@ -396,8 +403,9 @@ public class Program
                 case 0: EditItemName(presetToConfigure); break;
                 case 1: EditCurrency(presetToConfigure); break;
                 case 2: EditNtfyTopic(presetToConfigure); break;
-                case 3: EditPriceRiseThreshold(presetToConfigure); break;
-                case 4: EditPriceDropThreshold(presetToConfigure); break;
+                case 3: EditWindowsNotifications(presetToConfigure); break;
+                case 4: EditPriceRiseThreshold(presetToConfigure); break;
+                case 5: EditPriceDropThreshold(presetToConfigure); break;
             }
         }
         catch (OperationCanceledException)
@@ -475,6 +483,11 @@ public class Program
             Console.ReadKey(true);
             EditNtfyTopic(presetToConfigure); // Retry
         }
+    }
+
+    private static void EditWindowsNotifications(PresetConfig presetToConfigure)
+    {
+        presetToConfigure.UseWindowsNotifications = !presetToConfigure.UseWindowsNotifications;
     }
 
     private static void EditPriceRiseThreshold(PresetConfig presetToConfigure)
@@ -593,11 +606,20 @@ public class Program
                 Console.WriteLine($"Median price change: \t{(previousMedianPrice.HasValue ? (currentMedian - previousMedianPrice.Value).ToString("F2", CultureInfo.InvariantCulture) : "N/A")}");
                 Console.WriteLine("------------------------------------------");
 
-                if (currentLowest > priceRiseThreshold && isNtfyEnabled && priceRiseThreshold != 0.0f && !isAlertSent)
+                bool notificationsEnabled = isNtfyEnabled || useWindowsNotifications;
+
+                if (currentLowest > priceRiseThreshold && priceRiseThreshold != 0.0f && !isAlertSent)
                 {
-                    Console.WriteLine("\nWent over the threshold! Sending notification...");
-                    string message = $"Item's price went over the threshold! Current price: {priceData.LowestPrice}";
-                    await SendNtfyNotification(message);
+                    if (notificationsEnabled)
+                    {
+                        Console.WriteLine("\nWent over the threshold! Sending notification...");
+                        string message = $"Item's price went over the threshold!\nCurrent price: {priceData.LowestPrice}";
+                        await SendNotifications(message);
+                    }
+                    else
+                    {
+                        Console.WriteLine("\nWent over the threshold!");
+                    }
                     isAlertSent = true; // Set alert as sent
                 }
                 // Reset alert if price is not hitting either threshold
@@ -607,11 +629,18 @@ public class Program
                     isAlertSent = false;
                 }
 
-                if (currentLowest < priceDropThreshold && isNtfyEnabled && priceDropThreshold != 0.0f && !isAlertSent)
+                if (currentLowest < priceDropThreshold && priceDropThreshold != 0.0f && !isAlertSent)
                 {
-                    Console.WriteLine("\nPrice is below the drop threshold. Sending notification...");
-                    string message = $"Item's price is below the price drop threshold! Current price: {priceData.LowestPrice}";
-                    await SendNtfyNotification(message);
+                    if (notificationsEnabled)
+                    {
+                        Console.WriteLine("\nPrice is below the drop threshold. Sending notification...");
+                        string message = $"Item's price is below the price drop threshold!\nCurrent price: {priceData.LowestPrice}";
+                        await SendNotifications(message);
+                    }
+                    else
+                    {
+                        Console.WriteLine("\nPrice is below the drop threshold.");
+                    }
                     isAlertSent = true;
                 }
 
@@ -692,6 +721,20 @@ public class Program
     }
 
 
+    // === Notification Dispatcher ===
+    private static async Task SendNotifications(string message)
+    {
+        if (isNtfyEnabled)
+        {
+            await SendNtfyNotification(message);
+        }
+
+        if (useWindowsNotifications)
+        {
+            SendWindowsNotification(message);
+        }
+    }
+
     // === Send notification using ntfy.sh service ===
     private static async Task SendNtfyNotification(string message)
     {
@@ -721,6 +764,21 @@ public class Program
             Console.WriteLine($"Critical error while sending the notification: {e.Message}");
         }
     }
+
+    // === Send notification using Windows Action Center ===
+    private static void SendWindowsNotification(string message)
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            string displayItemName = itemName.Replace("%20", " ").Replace("%7C", "|").Replace("%E2%98%85", "★").Replace("%E2%84%A2", "™").Replace("%28", "(").Replace("%29", ")");
+
+            new ToastContentBuilder()
+                .AddText(displayItemName)
+                .AddText(message)
+                .Show();
+        }
+    }
+
 
     // === Supporting function to parse price strings ===
     private static float ParsePrice(string priceString)

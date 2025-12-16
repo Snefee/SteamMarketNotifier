@@ -17,4 +17,4 @@ A C# app that you can use to track prices of chosen items from the Steam market 
 - Add the ability to check the price history since the item has been tracked ✅ ~[and to export as CSV]~
 - ✅ ~Add presets [allow the user to set the item, currency and price threshold and save them as presets]~
 - ✅ ~Add GUI~
-
+- Add option to track item prices from other marketplaces

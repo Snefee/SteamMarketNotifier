@@ -8,10 +8,15 @@
     <Company>Snefee</Company>
     <Version>0.9.0</Version>
     <ApplicationIcon>SteamMarketNotifier_Icon.ico</ApplicationIcon>
+    
+    <PublishSingleFile>true</PublishSingleFile>
+    <SelfContained>true</SelfContained>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
   </PropertyGroup>
 
   <ItemGroup>
-    <Content Include="SteamMarketNotifier_Icon.ico" />
+    <EmbeddedResource Include="SteamMarketNotifier_Icon.ico" />
   </ItemGroup>
 
   <ItemGroup>

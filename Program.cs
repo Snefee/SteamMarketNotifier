@@ -73,7 +73,11 @@ public class Program
     // === Application version ===
     private static readonly string appVersion = Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "0.0.0";
 
-    private static readonly string configFile = Path.Combine(AppContext.BaseDirectory, "config.json");
+    private static string AppDirectory => Path.GetDirectoryName(Environment.ProcessPath) ?? AppContext.BaseDirectory;
+    
+    private static readonly string configFile = Path.Combine(AppDirectory, "config.json");
+    private static readonly string iconPath = Path.Combine(AppDirectory, "app_icon.ico");
+    
     private static string? _tempLogFilePath;
 
     private static readonly Dictionary<string, int> steamCurrencies = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
@@ -106,6 +110,10 @@ public class Program
     {
         Console.InputEncoding = Encoding.UTF8;
         Console.OutputEncoding = Encoding.UTF8;
+
+        // Extract icon for notifications
+        ExtractIconToFile();
+
     MainMenu:
         previousLowestPrice = null;
         previousMedianPrice = null;
@@ -298,6 +306,43 @@ public class Program
                 File.Delete(_tempLogFilePath);
                 _tempLogFilePath = null;
             }
+        }
+    }
+
+    private static void ExtractIconToFile()
+    {
+        try
+        {
+            var assembly = Assembly.GetExecutingAssembly();
+            string resourceName = "SteamMarketNotifier.SteamMarketNotifier_Icon.ico";
+            
+            if (assembly.GetManifestResourceStream(resourceName) == null)
+            {
+                var names = assembly.GetManifestResourceNames();
+                foreach(var name in names)
+                {
+                    if (name.EndsWith("SteamMarketNotifier_Icon.ico"))
+                    {
+                        resourceName = name;
+                        break;
+                    }
+                }
+            }
+
+            using (Stream? stream = assembly.GetManifestResourceStream(resourceName))
+            {
+                if (stream != null)
+                {
+                    using (FileStream fileStream = new FileStream(iconPath, FileMode.Create))
+                    {
+                        stream.CopyTo(fileStream);
+                    }
+                }
+            }
+        }
+        catch
+        {
+            // Fail if can't extract icon, notifications will just not have a custom icon
         }
     }
 
@@ -659,6 +704,7 @@ public class Program
         {
             Console.ForegroundColor = ConsoleColor.DarkYellow;
             Console.WriteLine($"\nAn error occured: {e.Message}");
+            Console.WriteLine($"Details: {e}");
             Console.ResetColor();
         }
     }
@@ -704,7 +750,8 @@ public class Program
             string sanitizedItemName = itemName.Replace("%20", "").Replace("%7C", "").Replace("%E2%98%85", "").Replace("%E2%84%A2", "").Replace("%28", "(").Replace("%29", ")");
             string timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
             string fileName = $"MarketLog_{sanitizedItemName}_{timestamp}.csv";
-            string finalPath = Path.Combine(AppContext.BaseDirectory, fileName);
+            
+            string finalPath = Path.Combine(AppDirectory, fileName);
 
             File.Copy(_tempLogFilePath, finalPath, true);
 
@@ -772,10 +819,16 @@ public class Program
         {
             string displayItemName = itemName.Replace("%20", " ").Replace("%7C", "|").Replace("%E2%98%85", "★").Replace("%E2%84%A2", "™").Replace("%28", "(").Replace("%29", ")");
 
-            new ToastContentBuilder()
+            var builder = new ToastContentBuilder()
                 .AddText(displayItemName)
-                .AddText(message)
-                .Show();
+                .AddText(message);
+
+            if (File.Exists(iconPath))
+            {
+                builder.AddAppLogoOverride(new Uri(iconPath), ToastGenericAppLogoCrop.Circle);
+            }
+
+            builder.Show();
         }
     }
 

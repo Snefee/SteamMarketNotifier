@@ -76,7 +76,8 @@ public class Program
     private static string AppDirectory => Path.GetDirectoryName(Environment.ProcessPath) ?? AppContext.BaseDirectory;
     
     private static readonly string configFile = Path.Combine(AppDirectory, "config.json");
-    private static readonly string iconPath = Path.Combine(AppDirectory, "app_icon.ico");
+    
+    private static readonly string iconPath = Path.Combine(Path.GetTempPath(), "SteamMarketNotifier_icon.ico");
     
     private static string? _tempLogFilePath;
 
